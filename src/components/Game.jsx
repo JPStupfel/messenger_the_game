@@ -6,6 +6,7 @@ import Player from './Player'
 import World from './World'
 import NPC from './NPC'
 import CollectableStar from './CollectableStar'
+import YetiFriend from './YetiFriend'
 import { NPCS, STARS } from '../gameData'
 import { touchInput } from '../keys'
 
@@ -19,7 +20,7 @@ const TOUCH_JOYSTICK_RADIUS = 80  // px — how far to drag for full speed
 function FollowCamera({ playerRef }) {
   const { camera, gl } = useThree()
   const yaw   = useRef(0)
-  const pitch = useRef(0.25)
+  const pitch = useRef(Math.PI * 0.42)  // Start low/behind the player
   const isDragging = useRef(false)
   const lastMouse  = useRef({ x: 0, y: 0 })
 
@@ -174,13 +175,13 @@ export default function Game({ onStarCollect }) {
 
   return (
     <>
-      {/* Lighting */}
-      <ambientLight intensity={0.55} color="#ede9fe" />
+      {/* Lighting — cool arctic tones */}
+      <ambientLight intensity={0.6} color="#e0f2fe" />
       <directionalLight
         castShadow
         position={[40, 60, 30]}
-        intensity={1.4}
-        color="#fff7ed"
+        intensity={1.3}
+        color="#f0f9ff"
         shadow-mapSize={[2048, 2048]}
         shadow-camera-near={0.5}
         shadow-camera-far={200}
@@ -189,21 +190,21 @@ export default function Game({ onStarCollect }) {
         shadow-camera-top={60}
         shadow-camera-bottom={-60}
       />
-      <pointLight position={[-20, 30, -20]} intensity={1.2} color="#a78bfa" distance={90} />
-      <pointLight position={[20, 10, 20]}   intensity={0.8} color="#f472b6" distance={60} />
+      <pointLight position={[-20, 30, -20]} intensity={1.4} color="#7dd3fc" distance={90} />
+      <pointLight position={[20, 10, 20]}   intensity={0.9} color="#67e8f9" distance={60} />
 
-      {/* Sky */}
+      {/* Arctic sky */}
       <Sky
         distance={450}
-        sunPosition={[10, 0.4, -1]}
-        inclination={0.52}
+        sunPosition={[10, 0.8, -1]}
+        inclination={0.48}
         azimuth={0.25}
-        turbidity={7}
-        rayleigh={1}
-        mieCoefficient={0.005}
-        mieDirectionalG={0.8}
+        turbidity={4}
+        rayleigh={0.6}
+        mieCoefficient={0.003}
+        mieDirectionalG={0.7}
       />
-      <Stars radius={120} depth={50} count={3000} factor={3} saturation={0.5} fade speed={0.5} />
+      <Stars radius={120} depth={50} count={4000} factor={3.5} saturation={0.2} fade speed={0.3} />
 
       {/* Follow camera (no OrbitControls) */}
       <FollowCamera playerRef={playerRef} />
@@ -217,6 +218,9 @@ export default function Game({ onStarCollect }) {
       {NPCS.map((npc) => (
         <NPC key={npc.id} data={npc} playerRef={playerRef} />
       ))}
+
+      {/* Little yeti companion — befriend it and it follows you! */}
+      <YetiFriend startPosition={[5, 0, 6]} playerRef={playerRef} />
     </>
   )
 }

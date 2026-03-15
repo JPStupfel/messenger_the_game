@@ -13,7 +13,7 @@ export default function HUD({ collected, total }) {
       {/* Title */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] tracking-wide">
-          ✨ Fantasy Island
+          ❄️ Snowboard Quest
         </h1>
       </div>
 
@@ -46,10 +46,10 @@ export default function HUD({ collected, total }) {
       </div>
 
       {/* Tip bubble — bottom right */}
-      <div className="absolute bottom-5 right-5 bg-purple-900/60 text-purple-100 rounded-2xl px-4 py-3 text-sm font-semibold backdrop-blur-sm border border-purple-400/30 max-w-[190px] text-center">
-        🌟 Collect the golden stars!
+      <div className="absolute bottom-5 right-5 bg-sky-900/60 text-sky-100 rounded-2xl px-4 py-3 text-sm font-semibold backdrop-blur-sm border border-sky-400/30 max-w-[190px] text-center">
+        ❄️ Collect the golden stars!
         <br />
-        <span className="text-purple-300 text-xs">Walk up to people to chat 💬</span>
+        <span className="text-sky-300 text-xs">Ride up to explorers to chat 💬</span>
       </div>
     </div>
   )
