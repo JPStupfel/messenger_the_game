@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Sky, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import Player from './Player'
-import ProceduralWorld from './ProceduralWorld'
+import CanyonWorld from './CanyonWorld'
 import LostNPC from './LostNPC'
 import VillageResident from './VillageResident'
 import PathTrace from './PathTrace'
@@ -218,9 +218,12 @@ export default function Game({ rescuedIds, followingIds, showPath, onStartFollow
       {/* Follow camera (no OrbitControls) */}
       <FollowCamera playerRef={playerRef} />
 
+      {/* Canyon world — replaces open procedural terrain */}
+      <fog attach="fog" color="#9bbfd4" near={60} far={220} />
+      <CanyonWorld />
+
       {/* Scene */}
       <Player ref={playerRef} returnTriggerRef={returnTriggerRef} />
-      <ProceduralWorld playerRef={playerRef} />
       <Village playerRef={playerRef} />
 
       {/* Lost NPCs — go find them and lead them home! */}

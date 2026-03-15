@@ -1,8 +1,7 @@
-import { useRef, useState, useMemo } from 'react'
+import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { createNoise2D, getTerrainHeight, WORLD_SEED } from './ProceduralWorld'
 
 const BEFRIEND_DIST = 3.5   // get this close to befriend
 const FOLLOW_DIST   = 2.5   // how close yeti stays when following
@@ -18,17 +17,14 @@ export default function YetiFriend({ startPosition, playerRef }) {
   const [befriended, setBefriended] = useState(true)  // Always following!
   const [showHeart, setShowHeart]   = useState(false)
   const hopPhase = useRef(0)
-  
-  // Noise for terrain height
-  const noise = useMemo(() => createNoise2D(WORLD_SEED), [])
 
   useFrame(({ clock }, delta) => {
     if (!groupRef.current || !playerRef?.current) return
     const yeti   = groupRef.current
     const player = playerRef.current
 
-    // Get terrain height at yeti position
-    const terrainY = getTerrainHeight(noise, yeti.position.x, yeti.position.z)
+    // Canyon floor is flat at Y = 0
+    const terrainY = 0
 
     _playerPos.copy(player.position)
     _yetiPos.set(yeti.position.x, terrainY, yeti.position.z)
@@ -78,11 +74,8 @@ export default function YetiFriend({ startPosition, playerRef }) {
     }
   })
 
-  // Calculate initial position on terrain
-  const initialPosition = useMemo(() => {
-    const y = getTerrainHeight(noise, startPosition[0], startPosition[2])
-    return [startPosition[0], y + 0.45, startPosition[2]]
-  }, [startPosition, noise])
+  // Initial position on flat canyon floor
+  const initialPosition = [startPosition[0], 0.45, startPosition[2]]
 
   return (
     <group ref={groupRef} position={initialPosition}>

@@ -7,10 +7,9 @@
 // A pulse wave travels along the dots from start to destination,
 // giving kids a clear "follow me" visual cue.
 
-import { useRef, useMemo } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { createNoise2D, getTerrainHeight, WORLD_SEED } from './ProceduralWorld'
 
 const MAX_DOTS    = 28     // Enough for ~110-unit path at DOT_SPACING=4; keeps GPU cost low
 const DOT_SPACING = 4      // World-units between each dot
@@ -24,7 +23,6 @@ const _col   = new THREE.Color()
 
 export default function PathTrace({ playerRef, npcs, rescuedIds, followingIds, showPath }) {
   const meshRef = useRef()
-  const noise   = useMemo(() => createNoise2D(WORLD_SEED), [])
 
   useFrame(() => {
     if (!meshRef.current) return
@@ -102,7 +100,7 @@ export default function PathTrace({ playerRef, npcs, rescuedIds, followingIds, s
         const dist = startOffset + (i + 1) * DOT_SPACING
         const wx = sx + nx * dist
         const wz = sz + nz * dist
-        const wy = getTerrainHeight(noise, wx, wz) + 0.45
+        const wy = 0.45  // canyon floor is flat at Y = 0; dots hover slightly above
 
         // Sequential pulse: wave travels from player toward target
         const t = i / Math.max(numDots - 1, 1)   // 0 at start, 1 at end

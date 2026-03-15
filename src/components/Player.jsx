@@ -1,9 +1,9 @@
-import { useRef, useEffect, forwardRef, useMemo } from 'react'
+import { useRef, useEffect, forwardRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PLAYER_HALF_HEIGHT  } from '../gameData'
 import { keys, touchInput } from '../keys'
-import { createNoise2D, getTerrainHeight, WORLD_SEED } from './ProceduralWorld'
+import { isInCorridorOrVillage } from '../canyonGen'
 
 const MOVE_SPEED = 8              // Direct movement speed
 const TURN_SPEED = 2.5            // Radians per second for left/right turning
@@ -26,9 +26,6 @@ const Player = forwardRef(function Player({ returnTriggerRef }, ref) {
   const velocity = useRef({ x: 0, z: 0 })  // Horizontal momentum
   const onGround = useRef(true)
   const canJump = useRef(true)  // Tracks if space has been released
-  
-  // Noise function for terrain height (same seed as world)
-  const noise = useMemo(() => createNoise2D(WORLD_SEED), [])
   
   // Animation refs
   const bodyRef = useRef()
@@ -68,17 +65,33 @@ const Player = forwardRef(function Player({ returnTriggerRef }, ref) {
     // Direct movement + coast
     if (moveDir.lengthSq() > 0) {
       moveDir.normalize()
-      // Direct movement - move at fixed speed
-      mesh.position.x += moveDir.x * MOVE_SPEED * delta
-      mesh.position.z += moveDir.z * MOVE_SPEED * delta
+
+      // Canyon wall collision — try full move, then axis-separated slide
+      const nx = mesh.position.x + moveDir.x * MOVE_SPEED * delta
+      const nz = mesh.position.z + moveDir.z * MOVE_SPEED * delta
+
+      if (isInCorridorOrVillage(nx, nz)) {
+        mesh.position.x = nx
+        mesh.position.z = nz
+      } else if (isInCorridorOrVillage(nx, mesh.position.z)) {
+        mesh.position.x = nx   // slide along Z wall
+      } else if (isInCorridorOrVillage(mesh.position.x, nz)) {
+        mesh.position.z = nz   // slide along X wall
+      }
+      // If all blocked — stop (corner)
+
       // Store last direction for coasting
       velocity.current.x = moveDir.x * MOVE_SPEED * 0.5
       velocity.current.z = moveDir.z * MOVE_SPEED * 0.5
       isMoving.current = true
     } else {
       // Coast when no input
-      mesh.position.x += velocity.current.x * delta
-      mesh.position.z += velocity.current.z * delta
+      const nx = mesh.position.x + velocity.current.x * delta
+      const nz = mesh.position.z + velocity.current.z * delta
+      if (isInCorridorOrVillage(nx, nz)) {
+        mesh.position.x = nx
+        mesh.position.z = nz
+      }
       velocity.current.x *= COAST_FRICTION
       velocity.current.z *= COAST_FRICTION
       // Kill tiny velocities
@@ -117,22 +130,18 @@ const Player = forwardRef(function Player({ returnTriggerRef }, ref) {
     verticalVel.current += GRAVITY * delta
     mesh.position.y += verticalVel.current * delta
 
-    // ── Collision: procedural terrain ────────────────────────────────
+    // ── Collision: flat canyon floor at Y = 0 ────────────────────────
     onGround.current = false
-    const terrainHeight = getTerrainHeight(noise, mesh.position.x, mesh.position.z)
-    const groundSurface = terrainHeight + PLAYER_HALF_HEIGHT
+    const groundSurface = PLAYER_HALF_HEIGHT   // canyon floor is always Y=0
     if (mesh.position.y <= groundSurface) {
       mesh.position.y = groundSurface
       verticalVel.current = 0
       onGround.current = true
     }
 
-
-
     // ── Fall off world → respawn ──────────────────────────────────────
     if (mesh.position.y < -50) {
-      const spawnHeight = getTerrainHeight(noise, 0, 0) + PLAYER_HALF_HEIGHT
-      mesh.position.set(0, spawnHeight + 2, 0)
+      mesh.position.set(0, PLAYER_HALF_HEIGHT + 2, 0)
       mesh.rotation.y = 0
       verticalVel.current = 0
       velocity.current.x = 0
@@ -142,8 +151,7 @@ const Player = forwardRef(function Player({ returnTriggerRef }, ref) {
     // ── Return to village button ──────────────────────────────────────
     if (returnTriggerRef?.current) {
       returnTriggerRef.current = false
-      const villageY = getTerrainHeight(noise, 0, 0) + PLAYER_HALF_HEIGHT + 0.5
-      mesh.position.set(0, villageY, 0)
+      mesh.position.set(0, PLAYER_HALF_HEIGHT + 0.5, 0)
       mesh.rotation.y = 0
       verticalVel.current = 0
       velocity.current.x = 0
