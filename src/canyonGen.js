@@ -113,7 +113,9 @@ export function isInCorridorOrVillage(x, z) {
     if (_inSegment(x, z, seg, tol)) return true
   }
   for (const junc of CANYON_NETWORK.junctions) {
-    const hw = HALF_W + HALF_WT + tol
+    // Junction pad matches the corridor half-width + tolerance so the player
+    // cannot legally reach beyond the mountain inner edge (HALF_W + CORRIDOR_TOL).
+    const hw = HALF_W + tol
     if (Math.abs(x - junc.x) <= hw && Math.abs(z - junc.z) <= hw) return true
   }
   return false
