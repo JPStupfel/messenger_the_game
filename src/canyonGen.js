@@ -2,6 +2,12 @@
 // CANYON MAZE GENERATOR
 // Produces a deterministic labyrinth of ice canyons radiating from the village.
 // The same seed always yields the same layout so players can memorise routes.
+//
+// Structure:
+//   • 4 main arms (N, E, S, W) × 10 corridor segments each
+//   • 8 branch corridors (2 per main arm) — some are dead ends, some lead to
+//     special zones: forest clearing, frozen lake, abandoned church, valley
+//   • 5 NPC waypoints spread across the main arms
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { mulberry32 } from './worldGen'
@@ -31,10 +37,36 @@ export const ARM_STARTS = [
   { sx: -VILLAGE_OPEN_RADIUS,   sz:  0,                   dir: 3 },  // West
 ]
 
-export const SEGS_PER_ARM  = 7    // segments per arm
-const SEG_LEN_MIN   = 34
-const SEG_LEN_MAX   = 55
+export const SEGS_PER_ARM  = 10   // corridor segments per main arm (was 7)
+const SEG_LEN_MIN   = 30
+const SEG_LEN_MAX   = 50
 const TURN_PROB     = 0.50  // chance of turning (50% → turn, split 50/50 L vs R)
+
+// Branch segment lengths — slightly shorter minimum so dead-end branches don't extend
+// too far from the main arm (keeps the overall maze footprint manageable).
+const BRANCH_LEN_MIN = 28
+const BRANCH_LEN_MAX = 50
+
+// ── Branch specifications ─────────────────────────────────────────────────────
+// Each branch stems from the END junction of a specific main arm segment.
+//   fromArm    : 0=North 1=East 2=South 3=West
+//   fromSeg    : segment index (0-based) whose end junction is the branch origin
+//   turnRight  : true = 90° clockwise from the main arm direction at that point
+//   segCount   : number of branch corridor segments
+//   special    : null (dead end) | 'forest' | 'lake' | 'church' | 'valley'
+const BRANCH_SPECS = [
+  { fromArm: 0, fromSeg: 3, turnRight: true,  segCount: 3, special: 'forest'  },
+  { fromArm: 0, fromSeg: 7, turnRight: false, segCount: 3, special: null       },
+  { fromArm: 1, fromSeg: 4, turnRight: false, segCount: 3, special: 'lake'     },
+  { fromArm: 1, fromSeg: 8, turnRight: true,  segCount: 2, special: null       },
+  { fromArm: 2, fromSeg: 3, turnRight: false, segCount: 2, special: null       },
+  { fromArm: 2, fromSeg: 7, turnRight: true,  segCount: 3, special: 'church'   },
+  { fromArm: 3, fromSeg: 3, turnRight: false, segCount: 3, special: 'valley'   },
+  { fromArm: 3, fromSeg: 7, turnRight: true,  segCount: 2, special: null       },
+]
+
+// Open-area radius for each special zone type (the circular walkable clearing)
+const SPECIAL_RADII = { forest: 20, lake: 16, church: 14, valley: 24 }
 
 // ── Generate the full canyon network ─────────────────────────────────────────
 export function generateCanyonNetwork(seed) {
@@ -71,9 +103,58 @@ export function generateCanyonNetwork(seed) {
     }
   })
 
-  // ── NPC waypoints (5 total, spread across the 4 arms) ────────────────────
-  // Depth (segment index, 0-based) at which each NPC is placed.
-  // Two NPCs occupy the North arm (indices 0 and 4) — one mid, one deep.
+// Each branch uses its own independent seeded RNG so branches don't affect
+// each other's random sequences and the layout is fully deterministic.
+const BRANCH_SEED_OFFSET     = 7777   // keeps branch seeds well away from main arm seed
+const BRANCH_SEED_MULTIPLIER = 1337   // prime-ish multiplier so each branch has a unique sequence
+  // ── Branch corridors ──────────────────────────────────────────────────────
+  const branchSegments  = []  // { x1,z1,x2,z2, dir,len, branchIdx,segIdx }
+  const branchJunctions = []  // { x, z, branchIdx, segIdx }
+  const specialZones    = []  // { type, x, z, radius }
+
+  BRANCH_SPECS.forEach((spec, branchIdx) => {
+    const bRng       = mulberry32(seed + BRANCH_SEED_OFFSET + branchIdx * BRANCH_SEED_MULTIPLIER)
+    const juncFlat   = spec.fromArm * SEGS_PER_ARM + spec.fromSeg
+    const fromJunc   = junctions[juncFlat]
+    const mainSeg    = segments[juncFlat]
+
+    // Turn 90° left or right from the main arm's direction at this junction
+    const branchDir0 = spec.turnRight
+      ? (mainSeg.dir + 1) % 4
+      : (mainSeg.dir + 3) % 4
+
+    let bx   = fromJunc.x
+    let bz   = fromJunc.z
+    let bdir = branchDir0
+
+    for (let bsIdx = 0; bsIdx < spec.segCount; bsIdx++) {
+      const blen      = BRANCH_LEN_MIN + Math.floor(bRng() * (BRANCH_LEN_MAX - BRANCH_LEN_MIN))
+      const { dx, dz } = DIR_VEC[bdir]
+      const bx2        = bx + dx * blen
+      const bz2        = bz + dz * blen
+
+      branchSegments.push({ x1: bx, z1: bz, x2: bx2, z2: bz2, dir: bdir, len: blen, branchIdx, segIdx: bsIdx })
+      branchJunctions.push({ x: bx2, z: bz2, branchIdx, segIdx: bsIdx })
+
+      bx = bx2
+      bz = bz2
+
+      // Consume two rng values for turn logic on every iteration so the count
+      // is constant regardless of whether a turn actually occurs.
+      const turnChance = bRng()
+      const turnDir    = bRng()
+      if (bsIdx < spec.segCount - 1 && turnChance < 0.35) {
+        bdir = turnDir < 0.5 ? (bdir + 1) % 4 : (bdir + 3) % 4
+      }
+    }
+
+    // Special zone clearing at the branch end point
+    if (spec.special) {
+      specialZones.push({ type: spec.special, x: bx, z: bz, radius: SPECIAL_RADII[spec.special] })
+    }
+  })
+
+  // ── NPC waypoints (5 total, spread across the 4 main arms) ───────────────
   const npcConfigs = [
     { armIdx: 0, segIdx: 3 },   // NPC 0 — North arm, mid
     { armIdx: 1, segIdx: 3 },   // NPC 1 — East arm
@@ -88,12 +169,10 @@ export function generateCanyonNetwork(seed) {
     return [(seg.x1 + seg.x2) / 2, 0, (seg.z1 + seg.z2) / 2]
   })
 
-  return { segments, junctions, npcWaypoints }
+  return { segments, junctions, branchSegments, branchJunctions, specialZones, npcWaypoints }
 }
 
 // ── Singleton — deterministic per session ────────────────────────────────────
-// This seed was chosen to produce a balanced maze with good NPC placement.
-// Change it to get a different (but always consistent) canyon layout.
 export const CANYON_SEED    = 54321
 export const CANYON_NETWORK = generateCanyonNetwork(CANYON_SEED)
 
@@ -103,21 +182,37 @@ export const CANYON_NETWORK = generateCanyonNetwork(CANYON_SEED)
 // visually walks inside the mountain.
 export const CORRIDOR_TOL = 1.5
 
-// ── Collision helper — is world point (x, z) inside a valid corridor? ────────
+// ── Collision helper — is world point (x, z) inside any walkable area? ───────
 export function isInCorridorOrVillage(x, z) {
   // Village open area (always valid)
   if (x * x + z * z < VILLAGE_OPEN_RADIUS * VILLAGE_OPEN_RADIUS) return true
 
-  const tol = CORRIDOR_TOL   // small tolerance to avoid wall-clipping
+  const tol = CORRIDOR_TOL
+  const hw  = HALF_W + tol
+
+  // Main arm segments
   for (const seg of CANYON_NETWORK.segments) {
     if (_inSegment(x, z, seg, tol)) return true
   }
+  // Main arm junction pads
   for (const junc of CANYON_NETWORK.junctions) {
-    // Junction pad matches the corridor half-width + tolerance so the player
-    // cannot legally reach beyond the mountain inner edge (HALF_W + CORRIDOR_TOL).
-    const hw = HALF_W + tol
     if (Math.abs(x - junc.x) <= hw && Math.abs(z - junc.z) <= hw) return true
   }
+  // Branch segments
+  for (const seg of CANYON_NETWORK.branchSegments) {
+    if (_inSegment(x, z, seg, tol)) return true
+  }
+  // Branch junction pads
+  for (const junc of CANYON_NETWORK.branchJunctions) {
+    if (Math.abs(x - junc.x) <= hw && Math.abs(z - junc.z) <= hw) return true
+  }
+  // Special zone clearings (circular open areas)
+  for (const zone of CANYON_NETWORK.specialZones) {
+    const ddx = x - zone.x
+    const ddz = z - zone.z
+    if (ddx * ddx + ddz * ddz < zone.radius * zone.radius) return true
+  }
+
   return false
 }
 

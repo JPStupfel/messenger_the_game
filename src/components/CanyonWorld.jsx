@@ -1,8 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // ICE CANYON WORLD
 // Renders the deterministic labyrinth of snowy mountain corridors radiating
-// from the village. Each corridor is flanked by rows of cone-shaped snowy
-// mountain peaks with a flat ice floor between them.
+// from the village, plus branch corridors with dead ends and special zones:
+//   • Forest clearing  — pine trees around a snow-free glade
+//   • Frozen lake      — reflective ice disc with snow surround
+//   • Abandoned church — ruined stone chapel with bell tower and cross
+//   • Valley clearing  — wide open alpine valley with rock formations
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { useMemo, useRef, useEffect } from 'react'
@@ -67,6 +70,7 @@ function mountainsForSide(seg, side, rng) {
 }
 
 // ── Corridor segment: snow floor + mountain rows on each side ─────────────────
+// Works for both main arm segments (armIdx/segIdx) and branch segments (branchIdx/segIdx).
 function CanyonSegment({ seg }) {
   const isNS = seg.dir === 0 || seg.dir === 2
   const cx   = (seg.x1 + seg.x2) / 2
@@ -77,9 +81,12 @@ function CanyonSegment({ seg }) {
     ? [CORRIDOR_WIDTH, 0.08, len]
     : [len, 0.08, CORRIDOR_WIDTH]
 
-  // Deterministic RNG seeded per segment so appearance is always the same
+  // Deterministic RNG seed: main arms use armIdx, branches use branchIdx offset by 10
   const peaks = useMemo(() => {
-    const rng   = mulberry32(seg.armIdx * 1000 + seg.segIdx * 7 + 42)
+    const seedBase = seg.armIdx !== undefined
+      ? seg.armIdx * 1000 + seg.segIdx * 7 + 42
+      : 10000 + (seg.branchIdx ?? 0) * 1000 + seg.segIdx * 7 + 42
+    const rng   = mulberry32(seedBase)
     const left  = mountainsForSide(seg, 0, rng)
     const right = mountainsForSide(seg, 1, rng)
     return [...left, ...right]
@@ -147,9 +154,10 @@ function SnowDrifts() {
   const { positions, count } = useMemo(() => {
     const rng = mulberry32(88888)
     const pts = []
-    const { segments } = CANYON_NETWORK
+    const { segments, branchSegments } = CANYON_NETWORK
+    const allSegs = [...segments, ...branchSegments]
 
-    segments.forEach((seg) => {
+    allSegs.forEach((seg) => {
       const isNS = seg.dir === 0 || seg.dir === 2
       for (let side = 0; side < 2; side++) {
         const sign = side === 0 ? -1 : 1
@@ -196,9 +204,246 @@ function SnowDrifts() {
   )
 }
 
+// Forest tree counts
+const FOREST_PERIMETER_TREES = 38  // ring of pines around and beyond the clearing edge
+const FOREST_INTERIOR_TREES  = 8   // scattered trees inside the glade for depth
+// A circular glade with earthy floor and a ring of snow-capped pine trees.
+function ForestZone({ zone }) {
+  const trees = useMemo(() => {
+    const rng = mulberry32(Math.round(zone.x * 100 + zone.z * 7 + 77777))
+    const result = []
+
+    // Dense ring of pines around the clearing perimeter and beyond
+    for (let i = 0; i < FOREST_PERIMETER_TREES; i++) {
+      const angle  = (i / FOREST_PERIMETER_TREES) * Math.PI * 2 + (rng() - 0.5) * 0.35
+      const dist   = zone.radius + 1 + rng() * 14
+      result.push({
+        x:      zone.x + Math.cos(angle) * dist,
+        z:      zone.z + Math.sin(angle) * dist,
+        height: 5 + rng() * 7,
+        scale:  0.6 + rng() * 0.8,
+      })
+    }
+
+    // A few scattered trees inside the glade for depth
+    for (let i = 0; i < FOREST_INTERIOR_TREES; i++) {
+      const angle = rng() * Math.PI * 2
+      const dist  = 4 + rng() * (zone.radius - 7)
+      result.push({
+        x:      zone.x + Math.cos(angle) * dist,
+        z:      zone.z + Math.sin(angle) * dist,
+        height: 3.5 + rng() * 4,
+        scale:  0.45 + rng() * 0.5,
+      })
+    }
+
+    return result
+  }, [zone])
+
+  return (
+    <group>
+      {/* Earthy glade floor */}
+      <mesh position={[zone.x, 0, zone.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[zone.radius, 20]} />
+        <meshStandardMaterial color="#3d5c38" roughness={0.9} />
+      </mesh>
+
+      {/* Pine trees */}
+      {trees.map((t, i) => (
+        <group key={i} position={[t.x, 0, t.z]}>
+          {/* Trunk */}
+          <mesh castShadow position={[0, t.height * 0.28, 0]}>
+            <cylinderGeometry args={[0.22 * t.scale, 0.38 * t.scale, t.height * 0.56, 6]} />
+            <meshStandardMaterial color="#4a2e0e" roughness={0.98} />
+          </mesh>
+          {/* Lower canopy layer */}
+          <mesh castShadow position={[0, t.height * 0.52, 0]}>
+            <coneGeometry args={[2.4 * t.scale, t.height * 0.65, 7]} />
+            <meshStandardMaterial color="#1e4d1a" roughness={0.88} />
+          </mesh>
+          {/* Mid canopy */}
+          <mesh castShadow position={[0, t.height * 0.73, 0]}>
+            <coneGeometry args={[1.65 * t.scale, t.height * 0.45, 6]} />
+            <meshStandardMaterial color="#255e20" roughness={0.85} />
+          </mesh>
+          {/* Snow-dusted tip */}
+          <mesh castShadow position={[0, t.height * 0.91, 0]}>
+            <coneGeometry args={[0.8 * t.scale, t.height * 0.22, 6]} />
+            <meshStandardMaterial color={SNOW_COLOR} roughness={0.6} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
+}
+
+// ── Frozen Lake ──────────────────────────────────────────────────────────────
+// A frozen lake disc with reflective ice and a snow-covered shore.
+function FrozenLake({ zone }) {
+  return (
+    <group>
+      {/* Snow shore */}
+      <mesh position={[zone.x, 0, zone.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[zone.radius, 20]} />
+        <meshStandardMaterial color="#d0e8f5" roughness={0.65} />
+      </mesh>
+      {/* Ice surface — slightly raised, reflective blue-white */}
+      <mesh position={[zone.x, 0.02, zone.z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[zone.radius - 3, 20]} />
+        <meshStandardMaterial color="#a8d4f0" roughness={0.05} metalness={0.7} transparent opacity={0.9} />
+      </mesh>
+      {/* Ice crack accent lines */}
+      {[0, 0.4, 0.9, 1.6, 2.4].map((rot, i) => (
+        <mesh key={i} position={[zone.x, 0.04, zone.z]} rotation={[-Math.PI / 2, rot, 0]}>
+          <planeGeometry args={[(zone.radius - 4) * 1.6, 0.4 + (i % 2) * 0.3]} />
+          <meshStandardMaterial color="#c8e8f8" roughness={0.1} transparent opacity={0.55} />
+        </mesh>
+      ))}
+      {/* Thin ice rim */}
+      <mesh position={[zone.x, 0.01, zone.z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[zone.radius - 3.2, zone.radius - 2.5, 20]} />
+        <meshStandardMaterial color="#b8dff5" roughness={0.3} />
+      </mesh>
+    </group>
+  )
+}
+
+// ── Abandoned Church ──────────────────────────────────────────────────────────
+// A ruined stone chapel with bell tower, cross, and scattered rubble.
+function AbandonedChurch({ zone }) {
+  const STONE      = '#787878'
+  const DARK_STONE = '#505050'
+  const ROOF_COL   = '#3e3535'
+
+  return (
+    <group position={[zone.x, 0, zone.z]}>
+      {/* Snow-covered churchyard */}
+      <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[zone.radius, 16]} />
+        <meshStandardMaterial color={SNOW_COLOR} roughness={0.82} />
+      </mesh>
+
+      {/* Nave — main hall */}
+      <mesh castShadow receiveShadow position={[0, 4, 1]}>
+        <boxGeometry args={[7, 8, 13]} />
+        <meshStandardMaterial color={STONE} roughness={0.95} />
+      </mesh>
+
+      {/* Pitched roof over nave */}
+      <mesh castShadow position={[0, 9.5, 1]} rotation={[0, Math.PI / 4, 0]}>
+        <coneGeometry args={[6.2, 4, 4]} />
+        <meshStandardMaterial color={ROOF_COL} roughness={0.92} />
+      </mesh>
+      {/* Snow on nave roof */}
+      <mesh position={[0, 10.8, 1]} rotation={[0, Math.PI / 4, 0]}>
+        <coneGeometry args={[3.5, 1.8, 4]} />
+        <meshStandardMaterial color={SNOW_COLOR} roughness={0.72} />
+      </mesh>
+
+      {/* Bell tower */}
+      <mesh castShadow receiveShadow position={[0, 7, -7.5]}>
+        <boxGeometry args={[4, 14, 4]} />
+        <meshStandardMaterial color={DARK_STONE} roughness={0.97} />
+      </mesh>
+      {/* Tower peaked roof */}
+      <mesh castShadow position={[0, 15, -7.5]} rotation={[0, Math.PI / 4, 0]}>
+        <coneGeometry args={[3.4, 4.5, 4]} />
+        <meshStandardMaterial color={ROOF_COL} roughness={0.92} />
+      </mesh>
+
+      {/* Cross — vertical beam */}
+      <mesh castShadow position={[0, 18.5, -7.5]}>
+        <boxGeometry args={[0.45, 3.5, 0.45]} />
+        <meshStandardMaterial color="#888888" roughness={0.85} />
+      </mesh>
+      {/* Cross — horizontal beam */}
+      <mesh castShadow position={[0, 19.5, -7.5]}>
+        <boxGeometry args={[2.2, 0.45, 0.45]} />
+        <meshStandardMaterial color="#888888" roughness={0.85} />
+      </mesh>
+
+      {/* Dark arched doorway (painted-on approximation) */}
+      <mesh position={[0, 2.8, 7.6]}>
+        <boxGeometry args={[2.6, 4.5, 0.4]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={1} />
+      </mesh>
+
+      {/* Broken stone wall rubble around the churchyard */}
+      {[
+        [-5.5, 2, 4], [5.5, 1.5, 2], [5.5, 2.5, -3],
+        [-5.5, 1.8, -4], [0, 2, 9], [-3, 1.5, 9],
+      ].map(([wx, wh, wz], i) => (
+        <mesh key={i} castShadow receiveShadow position={[wx, wh * 0.5, wz]}>
+          <boxGeometry args={[1.6 + (i % 2) * 0.6, wh, 1.6]} />
+          <meshStandardMaterial color={DARK_STONE} roughness={0.99} />
+        </mesh>
+      ))}
+
+      {/* Scattered snow-covered rubble stones */}
+      {[[-4, 8], [4, -5], [-6, -1], [6, 6], [2, 10]].map(([rx, rz], i) => (
+        <mesh key={i} castShadow position={[rx, 0.5, rz]}>
+          <dodecahedronGeometry args={[0.8 + (i % 3) * 0.3, 0]} />
+          <meshStandardMaterial color={STONE} roughness={0.98} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+// ── Valley Clearing ───────────────────────────────────────────────────────────
+// A wide open alpine valley with icy floor and surrounding rock formations.
+function ValleyClearing({ zone }) {
+  return (
+    <group>
+      {/* Wide valley floor */}
+      <mesh position={[zone.x, 0, zone.z]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[zone.radius, 24]} />
+        <meshStandardMaterial color={FLOOR_COLOR} roughness={0.68} metalness={0.08} />
+      </mesh>
+
+      {/* Rock formations ringing the valley edge */}
+      {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+        const angle  = (i / 8) * Math.PI * 2 + 0.4
+        const dist   = zone.radius - 3 + (i % 2) * 5
+        const height = 3 + (i % 4)
+        return (
+          <group key={i} position={[zone.x + Math.cos(angle) * dist, 0, zone.z + Math.sin(angle) * dist]}>
+            <mesh castShadow receiveShadow position={[0, height * 0.5, 0]}>
+              <dodecahedronGeometry args={[1.8 + (i % 3) * 0.6, 0]} />
+              <meshStandardMaterial color={ROCK_COLOR} roughness={0.96} />
+            </mesh>
+            {/* Snow dusting on rock tops */}
+            <mesh position={[0, height * 0.9, 0]}>
+              <sphereGeometry args={[1.0 + (i % 2) * 0.3, 6, 4]} />
+              <meshStandardMaterial color={SNOW_COLOR} roughness={0.7} />
+            </mesh>
+          </group>
+        )
+      })}
+
+      {/* Central icy patch — extra shimmer at valley floor center */}
+      <mesh position={[zone.x, 0.01, zone.z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[zone.radius * 0.45, 16]} />
+        <meshStandardMaterial color="#c8e4f4" roughness={0.1} metalness={0.4} transparent opacity={0.7} />
+      </mesh>
+    </group>
+  )
+}
+
+// ── Dispatch the right special zone component ─────────────────────────────────
+function SpecialZone({ zone }) {
+  switch (zone.type) {
+    case 'forest':  return <ForestZone zone={zone} />
+    case 'lake':    return <FrozenLake zone={zone} />
+    case 'church':  return <AbandonedChurch zone={zone} />
+    case 'valley':  return <ValleyClearing zone={zone} />
+    default:        return null
+  }
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function CanyonWorld() {
-  const { segments, junctions } = CANYON_NETWORK
+  const { segments, junctions, branchSegments, branchJunctions, specialZones } = CANYON_NETWORK
 
   return (
     <group>
@@ -208,21 +453,36 @@ export default function CanyonWorld() {
         <meshStandardMaterial color="#b5cfe0" roughness={0.85} />
       </mesh>
 
-      {/* Canyon corridor segments (floor + mountain walls) */}
+      {/* ── Main arm corridor segments (floor + mountain walls) ── */}
       {segments.map((seg, i) => (
         <CanyonSegment key={i} seg={seg} />
       ))}
 
-      {/* Junction floor pads at every segment turn */}
+      {/* ── Main arm junction floor pads ── */}
       {junctions.map((junc, i) => (
         <CanyonJunction key={i} junc={junc} />
+      ))}
+
+      {/* ── Branch corridor segments (floor + mountain walls) ── */}
+      {branchSegments.map((seg, i) => (
+        <CanyonSegment key={`b${i}`} seg={seg} />
+      ))}
+
+      {/* ── Branch junction floor pads ── */}
+      {branchJunctions.map((junc, i) => (
+        <CanyonJunction key={`bj${i}`} junc={junc} />
       ))}
 
       {/* Entry pads at the mouth of each arm (village → corridor) */}
       <EntryPads />
 
-      {/* Snow drift accents along corridor floors */}
+      {/* Snow drift accents along all corridor floors */}
       <SnowDrifts />
+
+      {/* ── Special zones at branch endpoints ── */}
+      {specialZones.map((zone, i) => (
+        <SpecialZone key={i} zone={zone} />
+      ))}
     </group>
   )
 }
