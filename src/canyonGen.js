@@ -97,12 +97,18 @@ export function generateCanyonNetwork(seed) {
 export const CANYON_SEED    = 54321
 export const CANYON_NETWORK = generateCanyonNetwork(CANYON_SEED)
 
+// ── Collision tolerance — exported so visual geometry can match ───────────────
+// The player may reach up to HALF_W + CORRIDOR_TOL from the corridor centreline.
+// Mountain meshes must have their inner edge ≥ this value so the player never
+// visually walks inside the mountain.
+export const CORRIDOR_TOL = 1.5
+
 // ── Collision helper — is world point (x, z) inside a valid corridor? ────────
 export function isInCorridorOrVillage(x, z) {
   // Village open area (always valid)
   if (x * x + z * z < VILLAGE_OPEN_RADIUS * VILLAGE_OPEN_RADIUS) return true
 
-  const tol = 1.5   // small tolerance to avoid wall-clipping
+  const tol = CORRIDOR_TOL   // small tolerance to avoid wall-clipping
   for (const seg of CANYON_NETWORK.segments) {
     if (_inSegment(x, z, seg, tol)) return true
   }

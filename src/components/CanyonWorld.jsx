@@ -11,6 +11,7 @@ import {
   CANYON_NETWORK,
   CORRIDOR_WIDTH,
   HALF_W,
+  CORRIDOR_TOL,
   ARM_STARTS,
   SEGS_PER_ARM,
 } from '../canyonGen'
@@ -27,9 +28,11 @@ const MTN_R_MIN    = 6.5  // minimum base radius
 const MTN_R_MAX    = 9.5  // maximum base radius
 const MTN_H_MIN    = 14   // minimum height
 const MTN_H_MAX    = 22   // maximum height
-// Mountains are centred this far from the corridor centre line:
-// inner edge lands exactly at HALF_W so they don't protrude into the walkway
-const MTN_INNER_OFFSET = HALF_W  // corridor half-width = inner edge of mountain base
+// Mountains are centred this far from the corridor centre line.
+// Inner edge lands at HALF_W + CORRIDOR_TOL so the player collision boundary
+// (which allows up to HALF_W + CORRIDOR_TOL from centre) never visually
+// intersects the mountain mesh.
+const MTN_INNER_OFFSET = HALF_W + CORRIDOR_TOL  // 6 + 1.5 = 7.5
 
 // ── Build mountain peak data for one wall side of a segment ──────────────────
 function mountainsForSide(seg, side, rng) {
