@@ -24,15 +24,15 @@ import {
 const WORLD_SEED = 12345
 
 // ── Geometry pools (created once, reused) ────────────────────────────────────
-const TREE_SEGMENTS = 8
-const MAX_INSTANCES_PER_TYPE = 2000
+const TREE_SEGMENTS = 5
+const MAX_INSTANCES_PER_TYPE = 800
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TERRAIN CHUNK - Uses a plane geometry with displaced vertices
 // ═══════════════════════════════════════════════════════════════════════════
 function TerrainChunk({ cx, cz, noise }) {
   const meshRef = useRef()
-  const resolution = 32 // Vertices per side
+  const resolution = 12 // Vertices per side - LOFI
   
   const geometry = useMemo(() => {
     const geo = new THREE.PlaneGeometry(

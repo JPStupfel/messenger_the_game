@@ -82,10 +82,10 @@ export function fbm(noise, x, y, octaves = 4, lacunarity = 2, persistence = 0.5)
 
 // ── Chunk configuration ──────────────────────────────────────────────────────
 export const CHUNK_SIZE = 64         // World units per chunk
-export const RENDER_DISTANCE = 3     // Chunks in each direction
-export const UNLOAD_DISTANCE = 5     // Chunks before unloading
-export const TERRAIN_SCALE = 0.012   // Noise scale (smaller = bigger features)
-export const TERRAIN_HEIGHT = 45     // Max terrain height variation - STEEP!
+export const RENDER_DISTANCE = 2     // Chunks in each direction - LOFI
+export const UNLOAD_DISTANCE = 4     // Chunks before unloading
+export const TERRAIN_SCALE = 0.008   // Noise scale (smaller = bigger features) - SMOOTHER
+export const TERRAIN_HEIGHT = 30     // Max terrain height variation - less extreme
 export const BASE_HEIGHT = 0         // Base ground level
 
 // ── Biome types ──────────────────────────────────────────────────────────────
@@ -112,32 +112,26 @@ export const TREE_TYPE = {
   FROZEN_TREE: 'frozen_tree',
 }
 
-// ── Get biome at world position ──────────────────────────────────────────────
+// ── Get biome at world position (LOFI - simplified) ─────────────────────────
 export function getBiome(noise, x, z) {
-  // Multiple noise layers for varied biome distribution
-  const elevation = fbm(noise, x * 0.004, z * 0.004, 3)
-  const moisture = fbm(noise, x * 0.006 + 500, z * 0.006 + 500, 2)
-  const temperature = fbm(noise, x * 0.003 + 1000, z * 0.003 + 1000, 2)
-  const variation = fbm(noise, x * 0.02, z * 0.02, 2)
+  // Simple 2-layer biome determination
+  const elevation = fbm(noise, x * 0.003, z * 0.003, 1)
+  const moisture = fbm(noise, x * 0.004 + 500, z * 0.004 + 500, 1)
   
   // High elevation = mountains
-  if (elevation > 0.5) return BIOME.ALPINE_PEAKS
-  if (elevation > 0.35) return BIOME.ICE_MOUNTAINS
+  if (elevation > 0.4) return BIOME.ALPINE_PEAKS
+  if (elevation > 0.25) return BIOME.ICE_MOUNTAINS
   
-  // Low elevation + cold = lake or canyon
-  if (elevation < -0.35) {
-    if (temperature < -0.1) return BIOME.FROZEN_LAKE
+  // Low elevation = lake or canyon
+  if (elevation < -0.3) {
+    if (moisture > 0) return BIOME.FROZEN_LAKE
     return BIOME.CANYON
   }
   
   // Mid elevations - forests and plains
-  if (moisture > 0.3) {
-    if (variation > 0.2) return BIOME.DENSE_PINE_FOREST
-    return BIOME.FROZEN_FOREST
-  }
-  if (moisture > 0.0 && temperature > 0.1) return BIOME.BIRCH_GROVE
-  if (moisture < -0.25) return BIOME.CRYSTAL_FIELD
-  if (temperature < -0.2) return BIOME.TUNDRA
+  if (moisture > 0.25) return BIOME.DENSE_PINE_FOREST
+  if (moisture > 0) return BIOME.FROZEN_FOREST
+  if (moisture < -0.2) return BIOME.CRYSTAL_FIELD
   
   return BIOME.SNOW_PLAINS
 }
@@ -159,92 +153,53 @@ export function getTerrainHeight(noise, x, z) {
   const biome = getBiome(noise, x, z)
   let height = BASE_HEIGHT
   
-  // Base terrain using FBM with more octaves for detail
-  const baseNoise = fbm(noise, x * TERRAIN_SCALE, z * TERRAIN_SCALE, 6, 2.0, 0.5)
+  // LOFI: Simple terrain using FBM with fewer octaves
+  const baseNoise = fbm(noise, x * TERRAIN_SCALE, z * TERRAIN_SCALE, 2, 2.0, 0.5)
   
-  // Ridge noise for dramatic features
-  const ridges = ridgeNoise(noise, x, z, 0.006)
-  const microRidges = ridgeNoise(noise, x, z, 0.02)
-  const steps = stepNoise(noise, x, z, 6)
-  
-  // Warping for more natural look
-  const warpX = fbm(noise, x * 0.008 + 200, z * 0.008, 2) * 20
-  const warpZ = fbm(noise, x * 0.008, z * 0.008 + 200, 2) * 20
-  const warpedNoise = fbm(noise, (x + warpX) * TERRAIN_SCALE, (z + warpZ) * TERRAIN_SCALE, 4)
-  
-  // Steep half-pipe / terrain park features
-  const pipeNoise = Math.sin(fbm(noise, x * 0.015, z * 0.015, 2) * Math.PI * 3)
+  // Simple ridge noise for some variety
+  const ridges = ridgeNoise(noise, x, z, 0.004)
   
   switch (biome) {
     case BIOME.ALPINE_PEAKS:
-      // MASSIVE jagged peaks with dramatic drops
-      height += baseNoise * TERRAIN_HEIGHT * 2.5
-      height += Math.max(0, ridges) * 60  // Huge ridges
-      height += microRidges * 15
-      height += Math.max(0, warpedNoise * 30)
-      height += steps * 20  // Cliff ledges
+      height += baseNoise * TERRAIN_HEIGHT * 2.0
+      height += Math.max(0, ridges) * 25
       break
       
     case BIOME.ICE_MOUNTAINS:
-      // Steep ski slopes with terrain park features
-      height += baseNoise * TERRAIN_HEIGHT * 2.0
-      height += Math.max(0, ridges * 0.8) * 45
-      height += pipeNoise * 12  // Half-pipe features
-      height += steps * 15
+      height += baseNoise * TERRAIN_HEIGHT * 1.5
+      height += Math.max(0, ridges * 0.6) * 20
       break
       
     case BIOME.CANYON:
-      // DEEP canyons with vertical walls
-      const canyonDepth = fbm(noise, x * 0.015, z * 0.015, 3)
-      height -= Math.abs(canyonDepth) * 40  // Deep!
-      height += Math.abs(microRidges) * 8
-      // Add cliff steps on walls
-      height += steps * 12
+      height -= Math.abs(baseNoise) * 20
       break
       
     case BIOME.FROZEN_LAKE:
-      // Flat frozen lake at bottom of terrain
       height += baseNoise * 0.5
-      height -= 15  // Much lower
+      height -= 10
       break
       
     case BIOME.DENSE_PINE_FOREST:
-      // Steep forested slopes
-      height += baseNoise * TERRAIN_HEIGHT * 1.4
-      height += warpedNoise * 10
-      height += pipeNoise * 5
+      height += baseNoise * TERRAIN_HEIGHT * 1.2
       break
       
     case BIOME.FROZEN_FOREST:
-      // Moderate slopes with features
-      height += baseNoise * TERRAIN_HEIGHT * 1.2
-      height += warpedNoise * 8
-      height += steps * 6
+      height += baseNoise * TERRAIN_HEIGHT * 1.0
       break
       
     case BIOME.BIRCH_GROVE:
-      // Rolling hills on ridges
-      height += baseNoise * TERRAIN_HEIGHT * 0.8
-      height += Math.max(0, ridges * 0.3) * 15
+      height += baseNoise * TERRAIN_HEIGHT * 0.7
       break
       
     case BIOME.CRYSTAL_FIELD:
-      // Steep crystalline formations
-      height += baseNoise * TERRAIN_HEIGHT * 1.0
-      height += Math.max(0, microRidges) * 12
-      height += Math.abs(pipeNoise) * 8
-      break
-      
-    case BIOME.TUNDRA:
-      // Low undulating terrain
       height += baseNoise * TERRAIN_HEIGHT * 0.6
-      height += Math.sin(x * 0.05) * Math.cos(z * 0.05) * 5
+      height += Math.max(0, ridges) * 8
       break
       
-    default: // SNOW_PLAINS
-      height += baseNoise * TERRAIN_HEIGHT * 0.8
-      height += warpedNoise * 5
-      height += pipeNoise * 3  // Small bumps
+    case BIOME.SNOW_PLAINS:
+    default:
+      height += baseNoise * TERRAIN_HEIGHT * 0.5
+      break
   }
   
   return height
@@ -287,8 +242,8 @@ export function generateChunkObjects(noise, chunkX, chunkZ, seed) {
   const worldX0 = chunkX * CHUNK_SIZE
   const worldZ0 = chunkZ * CHUNK_SIZE
   
-  // Sample points within chunk - denser sampling for more objects
-  const SAMPLE_DENSITY = 6 // Check every N units
+  // Sample points within chunk - LOFI: less dense
+  const SAMPLE_DENSITY = 12 // Check every N units (higher = fewer objects)
   
   for (let lx = 0; lx < CHUNK_SIZE; lx += SAMPLE_DENSITY) {
     for (let lz = 0; lz < CHUNK_SIZE; lz += SAMPLE_DENSITY) {

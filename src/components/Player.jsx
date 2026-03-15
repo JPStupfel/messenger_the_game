@@ -5,12 +5,11 @@ import { PLAYER_HALF_HEIGHT  } from '../gameData'
 import { keys, touchInput } from '../keys'
 import { createNoise2D, getTerrainHeight, WORLD_SEED } from './ProceduralWorld'
 
-const SPEED = 12
+const MOVE_SPEED = 8              // Direct movement speed
 const JUMP_FORCE = 14
 const GRAVITY = -28
 const GLIDE_GRAVITY = -6
-const MOMENTUM_FRICTION = 0.9925 // How long momentum persists (higher = more glide)
-const MAX_SPEED = 25             // Max gliding speed
+const COAST_FRICTION = 0.92       // How quickly coasting slows down
 
 // Skin material with subtle warmth
 const skinMat = { color: '#f5d0c5', roughness: 0.7, metalness: 0 }
@@ -72,12 +71,15 @@ const Player = forwardRef(function Player(_, ref) {
       moveDir.addScaledVector(camForward, -touchInput.moveY)
     }
 
-    // Build momentum from input
+    // Direct movement + coast
     if (moveDir.lengthSq() > 0) {
       moveDir.normalize()
-      // Add to velocity (accelerate)
-      velocity.current.x += moveDir.x * SPEED * delta
-      velocity.current.z += moveDir.z * SPEED * delta
+      // Direct movement - move at fixed speed
+      mesh.position.x += moveDir.x * MOVE_SPEED * delta
+      mesh.position.z += moveDir.z * MOVE_SPEED * delta
+      // Store last direction for coasting
+      velocity.current.x = moveDir.x * MOVE_SPEED * 0.5
+      velocity.current.z = moveDir.z * MOVE_SPEED * 0.5
       isMoving.current = true
 
       // Rotate player to face movement direction (smooth)
@@ -87,23 +89,16 @@ const Player = forwardRef(function Player(_, ref) {
       while (diff < -Math.PI) diff += Math.PI * 2
       mesh.rotation.y += diff * 0.18
     } else {
+      // Coast when no input
+      mesh.position.x += velocity.current.x * delta
+      mesh.position.z += velocity.current.z * delta
+      velocity.current.x *= COAST_FRICTION
+      velocity.current.z *= COAST_FRICTION
+      // Kill tiny velocities
+      if (Math.abs(velocity.current.x) < 0.1) velocity.current.x = 0
+      if (Math.abs(velocity.current.z) < 0.1) velocity.current.z = 0
       isMoving.current = false
     }
-    
-    // Cap speed
-    const speed = Math.sqrt(velocity.current.x ** 2 + velocity.current.z ** 2)
-    if (speed > MAX_SPEED) {
-      velocity.current.x *= MAX_SPEED / speed
-      velocity.current.z *= MAX_SPEED / speed
-    }
-    
-    // Apply momentum to position (magic snowboard glides!)
-    mesh.position.x += velocity.current.x * delta
-    mesh.position.z += velocity.current.z * delta
-    
-    // Apply friction to slow down over time
-    velocity.current.x *= MOMENTUM_FRICTION
-    velocity.current.z *= MOMENTUM_FRICTION
 
     // ── Animate body ─────────────────────────────────────────────────
     breathePhase.current += delta * 2.5
