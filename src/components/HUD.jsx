@@ -13,8 +13,7 @@ export default function HUD() {
         <div className="text-purple-300 font-bold mb-1 text-base">Controls</div>
         <div><span className="bg-white/20 rounded px-1.5 py-0.5 font-mono text-xs">W A S D</span>  Move</div>
         <div><span className="bg-white/20 rounded px-1.5 py-0.5 font-mono text-xs">SPACE</span>  Jump</div>
-        <div><span className="bg-white/20 rounded px-1.5 py-0.5 font-mono text-xs">Mouse</span>  Rotate camera</div>
-        <div><span className="bg-white/20 rounded px-1.5 py-0.5 font-mono text-xs">Scroll</span>  Zoom</div>
+        <div><span className="bg-white/20 rounded px-1.5 py-0.5 font-mono text-xs">Drag</span>  Rotate camera</div>
       </div>
 
       {/* Tip bubble — bottom right */}
