@@ -7,6 +7,8 @@ import { isInCorridorOrVillage } from '../canyonGen'
 
 const MOVE_SPEED = 8              // Direct movement speed
 const TURN_SPEED = 2.5            // Radians per second for left/right turning
+const TOUCH_TURN_MULT = 3        // Touch turns 3× faster so the character pivots quickly
+const TOUCH_ARRIVE_SQ = 0.25    // Stop threshold: 0.5-unit radius squared
 const JUMP_FORCE = 14
 const GRAVITY = -28
 const GLIDE_GRAVITY = -6
@@ -53,14 +55,33 @@ const Player = forwardRef(function Player({ returnTriggerRef }, ref) {
     // ── Turning (left/right) ─────────────────────────────────────────
     if (keys.has('KeyA') || keys.has('ArrowLeft'))  mesh.rotation.y += TURN_SPEED * delta
     if (keys.has('KeyD') || keys.has('ArrowRight')) mesh.rotation.y -= TURN_SPEED * delta
-    if (touchInput.moveX !== 0) mesh.rotation.y -= touchInput.moveX * TURN_SPEED * delta
+    // Touch: smoothly turn toward the tapped world position
+    if (touchInput.worldTarget) {
+      const { x: tx, z: tz } = touchInput.worldTarget
+      const tdx = tx - mesh.position.x
+      const tdz = tz - mesh.position.z
+      const touchDistSq = tdx * tdx + tdz * tdz
+      if (touchDistSq > TOUCH_ARRIVE_SQ) {
+        const targetAngle = Math.atan2(tdx, tdz)
+        let angDiff = targetAngle - mesh.rotation.y
+        while (angDiff >  Math.PI) angDiff -= 2 * Math.PI
+        while (angDiff < -Math.PI) angDiff += 2 * Math.PI
+        mesh.rotation.y += Math.sign(angDiff) * Math.min(Math.abs(angDiff), TURN_SPEED * TOUCH_TURN_MULT * delta)
+      }
+    }
 
     // ── Forward/back movement (relative to player facing) ────────────
     const facing = new THREE.Vector3(Math.sin(mesh.rotation.y), 0, Math.cos(mesh.rotation.y))
     const moveDir = new THREE.Vector3()
     if (keys.has('KeyW') || keys.has('ArrowUp'))   moveDir.add(facing)
     if (keys.has('KeyS') || keys.has('ArrowDown')) moveDir.sub(facing)
-    if (touchInput.moveY !== 0) moveDir.addScaledVector(facing, -touchInput.moveY)
+    // Touch: walk forward toward the tapped world position (reuse distance computed above)
+    if (touchInput.worldTarget) {
+      const { x: tx, z: tz } = touchInput.worldTarget
+      const tdx = tx - mesh.position.x
+      const tdz = tz - mesh.position.z
+      if (tdx * tdx + tdz * tdz > TOUCH_ARRIVE_SQ) moveDir.add(facing)
+    }
 
     // Direct movement + coast
     if (moveDir.lengthSq() > 0) {
