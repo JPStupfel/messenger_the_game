@@ -4,9 +4,13 @@
 // The same seed always yields the same layout so players can memorise routes.
 //
 // Structure:
-//   • 4 main arms (N, E, S, W) × 10 corridor segments each
-//   • 8 branch corridors (2 per main arm) — some are dead ends, some lead to
-//     special zones: forest clearing, frozen lake, abandoned church, valley
+//   • 4 main arms (N, E, S, W) × 16 short corridor segments each
+//     Very short segments + high turn probability make each arm meander and
+//     double back, creating a tangled-mountain-landscape feel rather than
+//     four straight radial spokes.
+//   • 16 branch corridors (4 per main arm) — each with their own frequent
+//     turns; some are dead ends, some lead to special zones:
+//     forest clearing, frozen lake, abandoned church, alpine valley
 //   • 5 NPC waypoints spread across the main arms
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -37,15 +41,24 @@ export const ARM_STARTS = [
   { sx: -VILLAGE_OPEN_RADIUS,   sz:  0,                   dir: 3 },  // West
 ]
 
-export const SEGS_PER_ARM  = 10   // corridor segments per main arm (was 7)
-const SEG_LEN_MIN   = 30
-const SEG_LEN_MAX   = 50
-const TURN_PROB     = 0.50  // chance of turning (50% → turn, split 50/50 L vs R)
+// ── Main-arm corridor parameters ─────────────────────────────────────────────
+// Short segments + very high turn probability = constant turns so the corridor
+// meanders unpredictably instead of shooting in a single direction.
+export const SEGS_PER_ARM = 16    // more segments to build a compact tangled net
+const SEG_LEN_MIN  = 14           // short enough that two consecutive segments
+const SEG_LEN_MAX  = 22           // can't both appear "long and straight"
+const TURN_PROB    = 0.80         // 80 % chance of a 90° turn after each segment
 
-// Branch segment lengths — slightly shorter minimum so dead-end branches don't extend
-// too far from the main arm (keeps the overall maze footprint manageable).
-const BRANCH_LEN_MIN = 28
-const BRANCH_LEN_MAX = 50
+// ── Branch corridor parameters ───────────────────────────────────────────────
+// Branches are even shorter and turn even more, adding dense kinks everywhere.
+const BRANCH_LEN_MIN   = 12
+const BRANCH_LEN_MAX   = 20
+const BRANCH_TURN_PROB = 0.82     // branches turn even more than main arms (TURN_PROB + 0.02)
+                                   // so short dead-end spurs kink immediately and feel distinct
+
+// Seeding keeps each branch's random sequence fully independent of the others
+const BRANCH_SEED_OFFSET     = 7777   // well away from the main-arm seed range
+const BRANCH_SEED_MULTIPLIER = 1333   // coprime multiplier → unique sequence per branch
 
 // ── Branch specifications ─────────────────────────────────────────────────────
 // Each branch stems from the END junction of a specific main arm segment.
@@ -55,14 +68,26 @@ const BRANCH_LEN_MAX = 50
 //   segCount   : number of branch corridor segments
 //   special    : null (dead end) | 'forest' | 'lake' | 'church' | 'valley'
 const BRANCH_SPECS = [
-  { fromArm: 0, fromSeg: 3, turnRight: true,  segCount: 3, special: 'forest'  },
-  { fromArm: 0, fromSeg: 7, turnRight: false, segCount: 3, special: null       },
-  { fromArm: 1, fromSeg: 4, turnRight: false, segCount: 3, special: 'lake'     },
-  { fromArm: 1, fromSeg: 8, turnRight: true,  segCount: 2, special: null       },
-  { fromArm: 2, fromSeg: 3, turnRight: false, segCount: 2, special: null       },
-  { fromArm: 2, fromSeg: 7, turnRight: true,  segCount: 3, special: 'church'   },
-  { fromArm: 3, fromSeg: 3, turnRight: false, segCount: 3, special: 'valley'   },
-  { fromArm: 3, fromSeg: 7, turnRight: true,  segCount: 2, special: null       },
+  // ── North arm ─────────────────────────────────────────────────────────────
+  { fromArm: 0, fromSeg:  2, turnRight: true,  segCount: 5, special: 'forest'  },
+  { fromArm: 0, fromSeg:  5, turnRight: false, segCount: 4, special: null       },
+  { fromArm: 0, fromSeg:  9, turnRight: true,  segCount: 5, special: null       },
+  { fromArm: 0, fromSeg: 13, turnRight: false, segCount: 3, special: null       },
+  // ── East arm ──────────────────────────────────────────────────────────────
+  { fromArm: 1, fromSeg:  2, turnRight: false, segCount: 5, special: 'lake'     },
+  { fromArm: 1, fromSeg:  5, turnRight: true,  segCount: 4, special: null       },
+  { fromArm: 1, fromSeg:  9, turnRight: false, segCount: 5, special: null       },
+  { fromArm: 1, fromSeg: 13, turnRight: true,  segCount: 3, special: null       },
+  // ── South arm ─────────────────────────────────────────────────────────────
+  { fromArm: 2, fromSeg:  2, turnRight: false, segCount: 4, special: null       },
+  { fromArm: 2, fromSeg:  5, turnRight: true,  segCount: 5, special: 'church'   },
+  { fromArm: 2, fromSeg:  9, turnRight: false, segCount: 5, special: null       },
+  { fromArm: 2, fromSeg: 13, turnRight: true,  segCount: 3, special: null       },
+  // ── West arm ──────────────────────────────────────────────────────────────
+  { fromArm: 3, fromSeg:  2, turnRight: true,  segCount: 5, special: 'valley'   },
+  { fromArm: 3, fromSeg:  5, turnRight: false, segCount: 4, special: null       },
+  { fromArm: 3, fromSeg:  9, turnRight: true,  segCount: 5, special: null       },
+  { fromArm: 3, fromSeg: 13, turnRight: false, segCount: 3, special: null       },
 ]
 
 // Open-area radius for each special zone type (the circular walkable clearing)
@@ -92,31 +117,28 @@ export function generateCanyonNetwork(seed) {
       x = x2
       z = z2
 
-      // Pick next direction — no U-turns
+      // Pick next direction — no U-turns; TURN_PROB is very high so the path
+      // almost always bends at each junction, creating constant direction changes.
       const t = rng()
       if (t < TURN_PROB / 2) {
         dir = (dir + 1) % 4   // turn right 90°
       } else if (t < TURN_PROB) {
         dir = (dir + 3) % 4   // turn left 90°
       }
-      // else: continue straight
+      // else: continue straight (only ~20 % of junctions)
     }
   })
 
-// Each branch uses its own independent seeded RNG so branches don't affect
-// each other's random sequences and the layout is fully deterministic.
-const BRANCH_SEED_OFFSET     = 7777   // keeps branch seeds well away from main arm seed
-const BRANCH_SEED_MULTIPLIER = 1337   // prime-ish multiplier so each branch has a unique sequence
   // ── Branch corridors ──────────────────────────────────────────────────────
   const branchSegments  = []  // { x1,z1,x2,z2, dir,len, branchIdx,segIdx }
   const branchJunctions = []  // { x, z, branchIdx, segIdx }
   const specialZones    = []  // { type, x, z, radius }
 
   BRANCH_SPECS.forEach((spec, branchIdx) => {
-    const bRng       = mulberry32(seed + BRANCH_SEED_OFFSET + branchIdx * BRANCH_SEED_MULTIPLIER)
-    const juncFlat   = spec.fromArm * SEGS_PER_ARM + spec.fromSeg
-    const fromJunc   = junctions[juncFlat]
-    const mainSeg    = segments[juncFlat]
+    const bRng     = mulberry32(seed + BRANCH_SEED_OFFSET + branchIdx * BRANCH_SEED_MULTIPLIER)
+    const juncFlat = spec.fromArm * SEGS_PER_ARM + spec.fromSeg
+    const fromJunc = junctions[juncFlat]
+    const mainSeg  = segments[juncFlat]
 
     // Turn 90° left or right from the main arm's direction at this junction
     const branchDir0 = spec.turnRight
@@ -128,7 +150,7 @@ const BRANCH_SEED_MULTIPLIER = 1337   // prime-ish multiplier so each branch has
     let bdir = branchDir0
 
     for (let bsIdx = 0; bsIdx < spec.segCount; bsIdx++) {
-      const blen      = BRANCH_LEN_MIN + Math.floor(bRng() * (BRANCH_LEN_MAX - BRANCH_LEN_MIN))
+      const blen       = BRANCH_LEN_MIN + Math.floor(bRng() * (BRANCH_LEN_MAX - BRANCH_LEN_MIN))
       const { dx, dz } = DIR_VEC[bdir]
       const bx2        = bx + dx * blen
       const bz2        = bz + dz * blen
@@ -139,11 +161,11 @@ const BRANCH_SEED_MULTIPLIER = 1337   // prime-ish multiplier so each branch has
       bx = bx2
       bz = bz2
 
-      // Consume two rng values for turn logic on every iteration so the count
-      // is constant regardless of whether a turn actually occurs.
+      // Consume two rng values every iteration so the sequence is constant
+      // regardless of whether an actual turn occurs (determinism guarantee).
       const turnChance = bRng()
       const turnDir    = bRng()
-      if (bsIdx < spec.segCount - 1 && turnChance < 0.35) {
+      if (bsIdx < spec.segCount - 1 && turnChance < BRANCH_TURN_PROB) {
         bdir = turnDir < 0.5 ? (bdir + 1) % 4 : (bdir + 3) % 4
       }
     }
@@ -156,11 +178,11 @@ const BRANCH_SEED_MULTIPLIER = 1337   // prime-ish multiplier so each branch has
 
   // ── NPC waypoints (5 total, spread across the 4 main arms) ───────────────
   const npcConfigs = [
-    { armIdx: 0, segIdx: 3 },   // NPC 0 — North arm, mid
-    { armIdx: 1, segIdx: 3 },   // NPC 1 — East arm
-    { armIdx: 2, segIdx: 4 },   // NPC 2 — South arm
-    { armIdx: 3, segIdx: 5 },   // NPC 3 — West arm, far
-    { armIdx: 0, segIdx: 6 },   // NPC 4 — North arm, deep
+    { armIdx: 0, segIdx:  5 },   // NPC 0 — North arm, early-mid
+    { armIdx: 1, segIdx:  5 },   // NPC 1 — East arm
+    { armIdx: 2, segIdx:  8 },   // NPC 2 — South arm, mid
+    { armIdx: 3, segIdx: 10 },   // NPC 3 — West arm, deep
+    { armIdx: 0, segIdx: 12 },   // NPC 4 — North arm, very deep
   ]
 
   const npcWaypoints = npcConfigs.map(({ armIdx, segIdx }) => {
