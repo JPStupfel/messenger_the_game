@@ -88,6 +88,11 @@ export const TERRAIN_SCALE = 0.008   // Noise scale (smaller = bigger features) 
 export const TERRAIN_HEIGHT = 30     // Max terrain height variation - less extreme
 export const BASE_HEIGHT = 0         // Base ground level
 
+// ── Village constants ─────────────────────────────────────────────────────────
+export const VILLAGE_Y = 0           // Village ground level (flat terrain here)
+export const VILLAGE_FLAT_RADIUS = 32  // Flat within this radius of origin
+export const VILLAGE_BLEND_RADIUS = 52 // Blend back to procedural beyond flat radius
+
 // ── Biome types ──────────────────────────────────────────────────────────────
 export const BIOME = {
   SNOW_PLAINS: 'snow_plains',
@@ -150,6 +155,12 @@ function stepNoise(noise, x, z, steps = 4) {
 
 // ── Get terrain height at world position ─────────────────────────────────────
 export function getTerrainHeight(noise, x, z) {
+  // ── Village plateau: flatten terrain near origin ─────────────────────────
+  const distFromVillage = Math.sqrt(x * x + z * z)
+  if (distFromVillage < VILLAGE_FLAT_RADIUS) {
+    return VILLAGE_Y
+  }
+
   const biome = getBiome(noise, x, z)
   let height = BASE_HEIGHT
   
@@ -201,6 +212,13 @@ export function getTerrainHeight(noise, x, z) {
       height += baseNoise * TERRAIN_HEIGHT * 0.5
       break
   }
+
+  // ── Smooth blend from village plateau to world terrain ─────────────────
+  if (distFromVillage < VILLAGE_BLEND_RADIUS) {
+    const t = (distFromVillage - VILLAGE_FLAT_RADIUS) / (VILLAGE_BLEND_RADIUS - VILLAGE_FLAT_RADIUS)
+    const smoothT = t * t * (3 - 2 * t) // smoothstep
+    return VILLAGE_Y * (1 - smoothT) + height * smoothT
+  }
   
   return height
 }
@@ -249,6 +267,14 @@ export function generateChunkObjects(noise, chunkX, chunkZ, seed) {
     for (let lz = 0; lz < CHUNK_SIZE; lz += SAMPLE_DENSITY) {
       const wx = worldX0 + lx + rng() * SAMPLE_DENSITY
       const wz = worldZ0 + lz + rng() * SAMPLE_DENSITY
+
+      // Skip object generation inside village area (keep it clear)
+      const distFromVillage = Math.sqrt(wx * wx + wz * wz)
+      if (distFromVillage < VILLAGE_BLEND_RADIUS) {
+        rng(); rng() // consume rolls to keep RNG deterministic
+        continue
+      }
+
       const biome = getBiome(noise, wx, wz)
       const height = getTerrainHeight(noise, wx, wz)
       const roll = rng()

@@ -20,7 +20,7 @@ const hairMid = '#dc2626'
 const hairTip = '#f87171'
 const hairHighlight = '#fca5a5'
 
-const Player = forwardRef(function Player(_, ref) {
+const Player = forwardRef(function Player({ returnTriggerRef }, ref) {
   const { camera } = useThree()
   const verticalVel = useRef(0)
   const velocity = useRef({ x: 0, z: 0 })  // Horizontal momentum
@@ -146,6 +146,17 @@ const Player = forwardRef(function Player(_, ref) {
     if (mesh.position.y < -50) {
       const spawnHeight = getTerrainHeight(noise, 0, 0) + PLAYER_HALF_HEIGHT
       mesh.position.set(0, spawnHeight + 2, 0)
+      mesh.rotation.y = 0
+      verticalVel.current = 0
+      velocity.current.x = 0
+      velocity.current.z = 0
+    }
+
+    // ── Return to village button ──────────────────────────────────────
+    if (returnTriggerRef?.current) {
+      returnTriggerRef.current = false
+      const villageY = getTerrainHeight(noise, 0, 0) + PLAYER_HALF_HEIGHT + 0.5
+      mesh.position.set(0, villageY, 0)
       mesh.rotation.y = 0
       verticalVel.current = 0
       velocity.current.x = 0

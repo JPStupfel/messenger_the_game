@@ -10,36 +10,39 @@ export const FLOATING_PLATFORMS = [
   { id: 'p4', x: -8,  y: 20, z: -20, rx: 4.5,h: 2,  color: '#bfdbfe', accent: '#60a5fa' },
 ]
 
-// Ground-level stars spread across the world (y value is offset above terrain)
+// Stars scattered beyond the village — collect them and bring them back to the well!
 export const STARS = [
-  { id: 's1', position: [8,    1,    8]   },   // Near spawn
-  { id: 's2', position: [-12,  1,   -10]  },   // Nearby
-  { id: 's3', position: [20,   1,  -25]   },   // Further out
-  { id: 's4', position: [-30,  2,   15]   },   // In a different direction
-  { id: 's5', position: [45,   3,   40]   },   // Far exploration reward
-  { id: 's6', position: [-50,  3,  -45]   },   // Far corner
-  { id: 's7', position: [70,   4,  -60]   },   // Very far - adventure reward
+  { id: 's1',  position: [55,   1,   20]  },  // East meadow
+  { id: 's2',  position: [-60,  1,   15]  },  // West fields
+  { id: 's3',  position: [40,   1,  -55]  },  // South valley
+  { id: 's4',  position: [-35,  2,  -60]  },  // Southwest slopes
+  { id: 's5',  position: [70,   3,   55]  },  // Far northeast
+  { id: 's6',  position: [-75,  3,  -50]  },  // Far southwest
+  { id: 's7',  position: [90,   4,  -70]  },  // Very far explorer reward
+  { id: 's8',  position: [-55,  2,   65]  },  // Far northwest
+  { id: 's9',  position: [30,   1,   70]  },  // North forest
+  { id: 's10', position: [-80,  3,   30]  },  // West mountains
 ]
 
 export const NPCS = [
   {
     id: 'yeti',
     name: '🏔️ Yuki the Yeti',
-    position: [10, 0, -8],
+    position: [55, 0, -30],
     bodyColor: '#e0f2fe',
     hatColor: '#7dd3fc',
     skinColor: '#f0f9ff',
     lines: [
       'Welcome to the endless snowlands! ❄️',
       'Your snowboard is magical!',
-      'Explore far and collect stars!',
+      'Collect stars and wish at the well!',
       'Crystal fields lie to the east...',
     ],
   },
   {
     id: 'penguin',
     name: '🐧 Captain Waddle',
-    position: [-15, 0, 5],
+    position: [-55, 0, 35],
     bodyColor: '#1e293b',
     hatColor: '#f97316',
     skinColor: '#f8fafc',
@@ -53,7 +56,7 @@ export const NPCS = [
   {
     id: 'fox',
     name: '🦊 Frosty',
-    position: [-25, 0, -20],
+    position: [-45, 0, -55],
     bodyColor: '#f97316',
     hatColor: '#ea580c',
     skinColor: '#fef3c7',
@@ -67,7 +70,7 @@ export const NPCS = [
   {
     id: 'walrus',
     name: '🦭 Old Whiskers',
-    position: [30, 0, 25],
+    position: [65, 0, 50],
     bodyColor: '#78716c',
     hatColor: '#57534e',
     skinColor: '#d6d3d1',
@@ -81,7 +84,7 @@ export const NPCS = [
   {
     id: 'owl',
     name: '🦉 Aurora',
-    position: [50, 0, -40],
+    position: [80, 0, -65],
     bodyColor: '#dbeafe',
     hatColor: '#93c5fd',
     skinColor: '#f0f9ff',

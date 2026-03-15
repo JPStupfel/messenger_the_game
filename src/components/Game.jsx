@@ -7,6 +7,7 @@ import ProceduralWorld from './ProceduralWorld'
 import NPC from './NPC'
 import CollectableStar from './CollectableStar'
 import YetiFriend from './YetiFriend'
+import Village from './Village'
 import { NPCS, STARS } from '../gameData'
 import { touchInput } from '../keys'
 
@@ -170,7 +171,7 @@ function FollowCamera({ playerRef }) {
 }
 
 // ── Game scene ────────────────────────────────────────────────────────────────
-export default function Game({ onStarCollect }) {
+export default function Game({ onStarCollect, carrying, onDeposit, onNearWellChange, returnTriggerRef }) {
   const playerRef = useRef()
 
   return (
@@ -210,8 +211,14 @@ export default function Game({ onStarCollect }) {
       <FollowCamera playerRef={playerRef} />
 
       {/* Scene */}
-      <Player ref={playerRef} />
+      <Player ref={playerRef} returnTriggerRef={returnTriggerRef} />
       <ProceduralWorld playerRef={playerRef} />
+      <Village
+        playerRef={playerRef}
+        carrying={carrying}
+        onDeposit={onDeposit}
+        onNearWellChange={onNearWellChange}
+      />
       {STARS.map((star) => (
         <CollectableStar key={star.id} data={star} playerRef={playerRef} onCollect={onStarCollect} />
       ))}
