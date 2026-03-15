@@ -1,17 +1,14 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // VILLAGE COMPONENT
 // A medium-sized snowy village centered at the origin.
-// The town square has a magical wishing well where stars can be deposited.
+// The wishing well at the town square serves as a landmark / home base.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { keys } from '../keys'
 import { VILLAGE_Y } from '../worldGen'
-
-const WELL_INTERACT_RADIUS = 4.5
 
 // ── Individual snowy house ────────────────────────────────────────────────────
 function SnowHouse({ position, rotation = 0, width = 4, depth = 3.5, height = 3, wallColor = '#dde8f0', roofColor = '#8B4513', accentColor = '#c0d4e0' }) {
@@ -147,65 +144,26 @@ function TownSquare() {
 }
 
 // ── Wishing well ──────────────────────────────────────────────────────────────
-function WishingWell({ playerRef, carrying, onDeposit, onNearWellChange }) {
+function WishingWell({ playerRef }) {
   const wellRef = useRef()
   const glowRef = useRef()
   const [near, setNear] = useState(false)
-  const [wishing, setWishing] = useState(false)
-  const wasNear = useRef(false)
-  const wishTimer = useRef(0)
 
   const _playerPos = new THREE.Vector3()
-  const _wellPos = new THREE.Vector3()
+  const _wellPos   = new THREE.Vector3()
 
-  // Key-press deposit handler
-  useEffect(() => {
-    const handleKey = (e) => {
-      if (e.code === 'KeyE' && near && carrying > 0 && !wishing) {
-        triggerWish()
-      }
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [near, carrying, wishing])
-
-  function triggerWish() {
-    if (wishing || carrying === 0) return
-    setWishing(true)
-    onDeposit()
-    wishTimer.current = 0
-  }
-
-  useFrame((_, delta) => {
+  useFrame(() => {
     if (!playerRef?.current || !wellRef.current) return
 
-    // Proximity check
     _playerPos.copy(playerRef.current.position)
     _wellPos.setFromMatrixPosition(wellRef.current.matrixWorld)
     const dist = _playerPos.distanceTo(_wellPos)
-    const isNear = dist < WELL_INTERACT_RADIUS
+    setNear(dist < 6)
 
-    if (isNear !== wasNear.current) {
-      wasNear.current = isNear
-      setNear(isNear)
-      onNearWellChange(isNear)
-    }
-
-    // Wish animation timer
-    if (wishing) {
-      wishTimer.current += delta
-      if (wishTimer.current > 2.5) {
-        setWishing(false)
-      }
-    }
-
-    // Animate glow when player is near and carrying stars
+    // Gentle ambient glow animation
     if (glowRef.current) {
-      const t = Date.now() * 0.003
-      const shouldGlow = carrying > 0
-      glowRef.current.intensity = shouldGlow
-        ? 1.2 + Math.sin(t * 3) * 0.6
-        : 0.2 + Math.sin(t) * 0.1
+      const t = Date.now() * 0.002
+      glowRef.current.intensity = 0.3 + Math.sin(t) * 0.1
     }
   })
 
@@ -227,7 +185,7 @@ function WishingWell({ playerRef, carrying, onDeposit, onNearWellChange }) {
         <meshStandardMaterial
           color="#00ccff"
           emissive="#0099ff"
-          emissiveIntensity={wishing ? 1.8 : 0.5}
+          emissiveIntensity={0.5}
           roughness={0.1}
           metalness={0.3}
           transparent
@@ -271,58 +229,36 @@ function WishingWell({ playerRef, carrying, onDeposit, onNearWellChange }) {
       {/* Magic glow light from the water */}
       <pointLight ref={glowRef} position={[0, 1.5, 0]} color="#55eeff" distance={12} decay={2} />
 
-      {/* Proximity ring */}
-      {near && (
-        <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[WELL_INTERACT_RADIUS - 0.15, WELL_INTERACT_RADIUS, 40]} />
-          <meshStandardMaterial color={carrying > 0 ? '#ffd700' : '#55eeff'} transparent opacity={0.22} />
-        </mesh>
-      )}
-
-      {/* Well speech bubble / interaction prompt */}
+      {/* Village landmark label — visible when nearby */}
       {near && (
         <Html center position={[0, 4.6, 0]} distanceFactor={10} occlude={false}>
-          <div
-            style={{
-              background: wishing ? 'rgba(255,215,0,0.95)' : 'white',
-              color: wishing ? '#7a5800' : '#1e1b4b',
-              padding: '8px 16px',
-              borderRadius: '16px',
-              fontSize: '14px',
-              fontWeight: '700',
-              fontFamily: 'system-ui, sans-serif',
-              textAlign: 'center',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
-              border: `2px solid ${wishing ? '#ffd700' : '#55eeff'}`,
-              whiteSpace: 'nowrap',
-              pointerEvents: 'none',
-              userSelect: 'none',
-              animation: 'popIn 0.2s ease',
-            }}
-          >
-            {wishing
-              ? '✨ Wish granted! ✨'
-              : carrying > 0
-                ? `⭐ ${carrying} star${carrying > 1 ? 's' : ''} to wish on!\nPress E to grant!`
-                : '🌊 The Wishing Well'}
+          <div style={{
+            background: 'white',
+            color: '#1e1b4b',
+            padding: '8px 16px',
+            borderRadius: '16px',
+            fontSize: '14px',
+            fontWeight: '700',
+            fontFamily: 'system-ui, sans-serif',
+            textAlign: 'center',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+            border: '2px solid #55eeff',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            animation: 'popIn 0.2s ease',
+          }}>
+            🏠 Village Square — bring everyone home!
           </div>
           <style>{`@keyframes popIn { from { transform: scale(0.6); opacity:0; } to { transform:scale(1); opacity:1; } }`}</style>
         </Html>
-      )}
-
-      {/* Wish burst animation */}
-      {wishing && (
-        <mesh position={[0, 2.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.5, 1.2, 32]} />
-          <meshStandardMaterial color="#ffd700" emissive="#ffd700" emissiveIntensity={2} transparent opacity={0.7} />
-        </mesh>
       )}
     </group>
   )
 }
 
 // ── Main Village component ────────────────────────────────────────────────────
-export default function Village({ playerRef, carrying, onDeposit, onNearWellChange }) {
+export default function Village({ playerRef }) {
   const BASE = VILLAGE_Y
 
   // House layout: position [x, z], rotation (y-axis radians), optional overrides
@@ -353,13 +289,8 @@ export default function Village({ playerRef, carrying, onDeposit, onNearWellChan
       {/* Town square */}
       <TownSquare />
 
-      {/* Wishing well */}
-      <WishingWell
-        playerRef={playerRef}
-        carrying={carrying}
-        onDeposit={onDeposit}
-        onNearWellChange={onNearWellChange}
-      />
+      {/* Wishing well — village landmark */}
+      <WishingWell playerRef={playerRef} />
 
       {/* Village sign near well */}
       <group position={[2.8, BASE, 2.8]}>
