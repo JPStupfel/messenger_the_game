@@ -1,20 +1,22 @@
 // Shared platform data used by both Player (physics) and World (rendering)
-import { CANYON_NETWORK } from './canyonGen'
 
 export const GROUND_Y = 0          // top surface of main island
 export const PLAYER_HALF_HEIGHT = 0.9  // half of player visual height for feet offset
 
-// NPC spawn positions come from the canyon generator so they always land
-// inside a corridor, regardless of which seed/arm produced them.
-const { npcWaypoints } = CANYON_NETWORK
+export const FLOATING_PLATFORMS = [
+  { id: 'p1', x: 14,  y: 8,  z: -10, rx: 5,  h: 2,  color: '#7dd3fc', accent: '#38bdf8' },
+  { id: 'p2', x: -16, y: 12, z: 6,   rx: 4,  h: 2,  color: '#a5f3fc', accent: '#22d3ee' },
+  { id: 'p3', x: 4,   y: 16, z: 18,  rx: 6,  h: 2,  color: '#93c5fd', accent: '#3b82f6' },
+  { id: 'p4', x: -8,  y: 20, z: -20, rx: 4.5,h: 2,  color: '#bfdbfe', accent: '#60a5fa' },
+]
 
-
-// Villagers lost in last night's blizzard — find them deep in the ice canyons!
+// Villagers lost in last night's blizzard — find them and lead them home!
+// villageSpot: [x, z] where each NPC hangs out once rescued
 export const NPCS = [
   {
     id: 'yeti',
     name: '🏔️ Yuki',
-    position: npcWaypoints[0],
+    position: [192, 0, -105],
     villageSpot: [5, -4],
     bodyColor: '#e0f2fe',
     hatColor: '#7dd3fc',
@@ -35,7 +37,7 @@ export const NPCS = [
   {
     id: 'penguin',
     name: '🐧 Captain Waddle',
-    position: npcWaypoints[1],
+    position: [-193, 0, 123],
     villageSpot: [-5, 3],
     bodyColor: '#1e293b',
     hatColor: '#f97316',
@@ -56,7 +58,7 @@ export const NPCS = [
   {
     id: 'fox',
     name: '🦊 Frostpaw',
-    position: npcWaypoints[2],
+    position: [-158, 0, -193],
     villageSpot: [4, 5],
     bodyColor: '#f97316',
     hatColor: '#ea580c',
@@ -77,7 +79,7 @@ export const NPCS = [
   {
     id: 'walrus',
     name: '🦭 Old Whiskers',
-    position: npcWaypoints[3],
+    position: [228, 0, 175],
     villageSpot: [-4, -5],
     bodyColor: '#78716c',
     hatColor: '#57534e',
@@ -98,7 +100,7 @@ export const NPCS = [
   {
     id: 'owl',
     name: '🦉 Aurora',
-    position: npcWaypoints[4],
+    position: [280, 0, -228],
     villageSpot: [6, 1],
     bodyColor: '#dbeafe',
     hatColor: '#93c5fd',

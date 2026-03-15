@@ -2,10 +2,11 @@
 // When the player gets close, the NPC starts following.
 // When the NPC reaches the village, it is rescued.
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
+import { createNoise2D, getTerrainHeight, WORLD_SEED } from './ProceduralWorld'
 
 const FIND_DIST     = 3.5   // Player must come this close to trigger following
 const FOLLOW_DIST   = 2.5   // How far behind the NPC trails the player
@@ -27,8 +28,14 @@ export default function LostNPC({ data, playerRef, onRescue, onStartFollowing, i
   const [isFollowing, setIsFollowing] = useState(false)
   const [near, setNear]               = useState(false)
 
-  // Terrain-adjusted spawn position — canyon floor is flat at Y = 0
-  const spawnPosition = [data.position[0], 0, data.position[2]]
+  const noise = useMemo(() => createNoise2D(WORLD_SEED), [])
+
+  // Terrain-adjusted spawn position
+  const spawnPosition = useMemo(() => {
+    const [x, , z] = data.position
+    const y = getTerrainHeight(noise, x, z)
+    return [x, y, z]
+  }, [data.position, noise])
 
   useFrame(({ clock }, delta) => {
     if (!groupRef.current || !playerRef?.current) return
@@ -36,7 +43,7 @@ export default function LostNPC({ data, playerRef, onRescue, onStartFollowing, i
     const npc    = groupRef.current
     const player = playerRef.current
 
-    const terrainY = 0  // canyon floor is always flat at Y = 0
+    const terrainY = getTerrainHeight(noise, npc.position.x, npc.position.z)
 
     _playerPos.copy(player.position)
     _npcPos.set(npc.position.x, terrainY, npc.position.z)

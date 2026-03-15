@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Sky, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import Player from './Player'
-import CanyonWorld from './CanyonWorld'
+import ProceduralWorld from './ProceduralWorld'
 import LostNPC from './LostNPC'
 import VillageResident from './VillageResident'
 import PathTrace from './PathTrace'
@@ -42,7 +42,7 @@ function FollowCamera({ playerRef }) {
   useEffect(() => {
     const canvas = gl.domElement
 
-    // ── Mouse: camera orbit (desktop) ───────────────────────────────
+    // ── Mouse: camera pitch only (desktop) ──────────────────────────
     const onMouseDown = (e) => {
       isDragging.current = true
       lastMouse.current = { x: e.clientX, y: e.clientY }
@@ -97,12 +97,12 @@ function FollowCamera({ playerRef }) {
           const dist = Math.sqrt(dx * dx + dy * dy)
           tapStart.current.maxMove = Math.max(tapStart.current.maxMove, dist)
         }
+
       } else if (ids.length >= 2) {
         // ── 2 fingers: camera pitch ──────────────────────────────────
         touchInput._screenPos = null
         const midX = (activeTouches.current[ids[0]].x + activeTouches.current[ids[1]].x) / 2
         const midY = (activeTouches.current[ids[0]].y + activeTouches.current[ids[1]].y) / 2
-        // yaw is driven by player facing — only adjust pitch with 2-finger vertical drag
         const dy = midY - twoFingerLast.current.y
         twoFingerLast.current = { x: midX, y: midY }
         pitch.current  = Math.max(0.05, Math.min(Math.PI * 0.45, pitch.current + dy * 0.005))
@@ -240,12 +240,9 @@ export default function Game({ rescuedIds, followingIds, showPath, onStartFollow
       {/* Follow camera (no OrbitControls) */}
       <FollowCamera playerRef={playerRef} />
 
-      {/* Canyon world — replaces open procedural terrain */}
-      <fog attach="fog" color="#9bbfd4" near={60} far={220} />
-      <CanyonWorld />
-
       {/* Scene */}
       <Player ref={playerRef} returnTriggerRef={returnTriggerRef} />
+      <ProceduralWorld playerRef={playerRef} />
       <Village playerRef={playerRef} />
 
       {/* Lost NPCs — go find them and lead them home! */}
