@@ -74,8 +74,8 @@ function CanyonSegment({ seg }) {
   const len  = seg.len
 
   const floorSize = isNS
-    ? [CORRIDOR_WIDTH, 0.3, len]
-    : [len, 0.3, CORRIDOR_WIDTH]
+    ? [CORRIDOR_WIDTH, 0.08, len]
+    : [len, 0.08, CORRIDOR_WIDTH]
 
   // Deterministic RNG seeded per segment so appearance is always the same
   const peaks = useMemo(() => {
@@ -88,7 +88,7 @@ function CanyonSegment({ seg }) {
   return (
     <group>
       {/* Snow floor strip */}
-      <mesh position={[cx, 0.15, cz]} receiveShadow>
+      <mesh position={[cx, 0, cz]} receiveShadow>
         <boxGeometry args={floorSize} />
         <meshStandardMaterial color={FLOOR_COLOR} roughness={0.75} metalness={0.1} />
       </mesh>
@@ -117,8 +117,8 @@ function CanyonSegment({ seg }) {
 function CanyonJunction({ junc }) {
   const padSize = CORRIDOR_WIDTH + 4   // slightly wider than corridor for visual continuity
   return (
-    <mesh position={[junc.x, 0.15, junc.z]} receiveShadow>
-      <boxGeometry args={[padSize, 0.3, padSize]} />
+    <mesh position={[junc.x, 0, junc.z]} receiveShadow>
+      <boxGeometry args={[padSize, 0.08, padSize]} />
       <meshStandardMaterial color={FLOOR_COLOR} roughness={0.75} metalness={0.1} />
     </mesh>
   )
@@ -131,8 +131,8 @@ function EntryPads() {
   return (
     <>
       {ARM_STARTS.map((arm, i) => (
-        <mesh key={i} position={[arm.sx, 0.15, arm.sz]} receiveShadow>
-          <boxGeometry args={[padSize, 0.3, padSize]} />
+        <mesh key={i} position={[arm.sx, 0, arm.sz]} receiveShadow>
+          <boxGeometry args={[padSize, 0.08, padSize]} />
           <meshStandardMaterial color={FLOOR_COLOR} roughness={0.75} metalness={0.1} />
         </mesh>
       ))}
