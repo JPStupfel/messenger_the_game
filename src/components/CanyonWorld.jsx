@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // ICE CANYON WORLD
-// Renders the deterministic labyrinth of ice-carved canyons that extends
-// from the village. Each corridor has towering ice walls, a snow-covered
-// floor, snow caps on the wall tops, and hanging icicles for atmosphere.
+// Renders the deterministic labyrinth of snowy mountain corridors radiating
+// from the village. Each corridor is flanked by rows of cone-shaped snowy
+// mountain peaks with a flat ice floor between them.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { useMemo, useRef, useEffect } from 'react'
@@ -10,116 +10,95 @@ import * as THREE from 'three'
 import {
   CANYON_NETWORK,
   CORRIDOR_WIDTH,
-  WALL_HEIGHT,
-  WALL_THICKNESS,
   HALF_W,
-  HALF_WT,
+  ARM_STARTS,
+  SEGS_PER_ARM,
 } from '../canyonGen'
 import { mulberry32 } from '../worldGen'
 
 // ── Shared material colours ───────────────────────────────────────────────────
-const WALL_COLOR   = '#4e6272'   // blue-grey icy rock
 const FLOOR_COLOR  = '#c5dded'   // pale ice blue
-const SNOW_COLOR   = '#e8f4ff'   // wall-top snow
-const ICICLE_COLOR = '#9dcde8'   // translucent ice blue
+const SNOW_COLOR   = '#eef6ff'   // bright snow white
+const ROCK_COLOR   = '#8fa8bc'   // blue-grey icy rock for mountain base
 
-const ICICLE_SEED = 77777
+// Mountain geometry constants
+const MTN_SPACING  = 11   // units between mountain centres along the wall
+const MTN_R_MIN    = 6.5  // minimum base radius
+const MTN_R_MAX    = 9.5  // maximum base radius
+const MTN_H_MIN    = 14   // minimum height
+const MTN_H_MAX    = 22   // maximum height
+// Mountains are centred this far from the corridor centre line:
+// inner edge lands exactly at HALF_W so they don't protrude into the walkway
+const MTN_INNER_OFFSET = HALF_W  // corridor half-width = inner edge of mountain base
 
-// ── Segment: floor strip + 2 wall panels + 2 snow caps ───────────────────────
+// ── Build mountain peak data for one wall side of a segment ──────────────────
+function mountainsForSide(seg, side, rng) {
+  const isNS  = seg.dir === 0 || seg.dir === 2
+  const sign  = side === 0 ? -1 : 1
+  const count = Math.max(2, Math.ceil(seg.len / MTN_SPACING))
+  const peaks = []
+
+  for (let k = 0; k < count; k++) {
+    const t  = (k + 0.5 + (rng() - 0.5) * 0.3) / count   // 0..1 along segment; ±0.3 jitter avoids perfect regularity
+    const r  = MTN_R_MIN + rng() * (MTN_R_MAX - MTN_R_MIN)
+    const h  = MTN_H_MIN + rng() * (MTN_H_MAX - MTN_H_MIN)
+    const jitter = (rng() - 0.5) * 2   // slight along-axis jitter
+
+    // Mountain centre: inner edge at MTN_INNER_OFFSET, centre at inner + r
+    const lateralOff = MTN_INNER_OFFSET + r
+
+    let x, z
+    if (isNS) {
+      x = (seg.x1 * (1 - t) + seg.x2 * t) + sign * lateralOff
+      z = seg.z1 * (1 - t) + seg.z2 * t + jitter
+    } else {
+      x = seg.x1 * (1 - t) + seg.x2 * t + jitter
+      z = (seg.z1 * (1 - t) + seg.z2 * t) + sign * lateralOff
+    }
+    peaks.push({ x, z, r, h })
+  }
+  return peaks
+}
+
+// ── Corridor segment: snow floor + mountain rows on each side ─────────────────
 function CanyonSegment({ seg }) {
   const isNS = seg.dir === 0 || seg.dir === 2
   const cx   = (seg.x1 + seg.x2) / 2
   const cz   = (seg.z1 + seg.z2) / 2
   const len  = seg.len
 
-  const HH  = WALL_HEIGHT / 2
-  const SNH = 0.6   // snow cap height
+  const floorSize = isNS
+    ? [CORRIDOR_WIDTH, 0.3, len]
+    : [len, 0.3, CORRIDOR_WIDTH]
 
-  // Geometry dimensions
-  const floorSize = isNS ? [CORRIDOR_WIDTH, 0.3, len]        : [len, 0.3, CORRIDOR_WIDTH]
-  const wallSize  = isNS ? [WALL_THICKNESS, WALL_HEIGHT, len] : [len, WALL_HEIGHT, WALL_THICKNESS]
-  const snowSize  = isNS ? [WALL_THICKNESS + 2, SNH, len + 1] : [len + 1, SNH, WALL_THICKNESS + 2]
-
-  // Wall 1 (West for NS, North for EW)
-  const w1 = isNS
-    ? [cx - HALF_W - HALF_WT, HH,             cz]
-    : [cx,                    HH,             cz - HALF_W - HALF_WT]
-  // Wall 2 (East for NS, South for EW)
-  const w2 = isNS
-    ? [cx + HALF_W + HALF_WT, HH,             cz]
-    : [cx,                    HH,             cz + HALF_W + HALF_WT]
-  // Snow caps
-  const s1 = isNS
-    ? [cx - HALF_W - HALF_WT, WALL_HEIGHT + SNH / 2, cz]
-    : [cx,                    WALL_HEIGHT + SNH / 2, cz - HALF_W - HALF_WT]
-  const s2 = isNS
-    ? [cx + HALF_W + HALF_WT, WALL_HEIGHT + SNH / 2, cz]
-    : [cx,                    WALL_HEIGHT + SNH / 2, cz + HALF_W + HALF_WT]
+  // Deterministic RNG seeded per segment so appearance is always the same
+  const peaks = useMemo(() => {
+    const rng   = mulberry32(seg.armIdx * 1000 + seg.segIdx * 7 + 42)
+    const left  = mountainsForSide(seg, 0, rng)
+    const right = mountainsForSide(seg, 1, rng)
+    return [...left, ...right]
+  }, [seg])
 
   return (
     <group>
-      {/* Floor */}
+      {/* Snow floor strip */}
       <mesh position={[cx, 0.15, cz]} receiveShadow>
         <boxGeometry args={floorSize} />
         <meshStandardMaterial color={FLOOR_COLOR} roughness={0.75} metalness={0.1} />
       </mesh>
 
-      {/* Wall 1 */}
-      <mesh position={w1} castShadow receiveShadow>
-        <boxGeometry args={wallSize} />
-        <meshStandardMaterial color={WALL_COLOR} roughness={0.88} metalness={0.05} />
-      </mesh>
-
-      {/* Wall 2 */}
-      <mesh position={w2} castShadow receiveShadow>
-        <boxGeometry args={wallSize} />
-        <meshStandardMaterial color={WALL_COLOR} roughness={0.88} metalness={0.05} />
-      </mesh>
-
-      {/* Snow cap 1 */}
-      <mesh position={s1} castShadow>
-        <boxGeometry args={snowSize} />
-        <meshStandardMaterial color={SNOW_COLOR} roughness={0.6} />
-      </mesh>
-
-      {/* Snow cap 2 */}
-      <mesh position={s2} castShadow>
-        <boxGeometry args={snowSize} />
-        <meshStandardMaterial color={SNOW_COLOR} roughness={0.6} />
-      </mesh>
-    </group>
-  )
-}
-
-// ── Junction: floor pad + corner wall blocks ─────────────────────────────────
-function CanyonJunction({ junc }) {
-  const padSize = CORRIDOR_WIDTH + WALL_THICKNESS * 2  // 12 + 12 = 24 units
-  const HH      = WALL_HEIGHT / 2
-  const SNH     = 0.6
-  const off     = HALF_W + HALF_WT   // corner offset from junction centre
-
-  return (
-    <group>
-      {/* Floor pad */}
-      <mesh position={[junc.x, 0.15, junc.z]} receiveShadow>
-        <boxGeometry args={[padSize, 0.3, padSize]} />
-        <meshStandardMaterial color={FLOOR_COLOR} roughness={0.75} metalness={0.1} />
-      </mesh>
-
-      {/* 4 corner wall blocks (fills gaps at turns) */}
-      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz], i) => (
-        <group key={i}>
-          <mesh
-            position={[junc.x + sx * off, HH, junc.z + sz * off]}
-            castShadow receiveShadow
-          >
-            <boxGeometry args={[WALL_THICKNESS, WALL_HEIGHT, WALL_THICKNESS]} />
-            <meshStandardMaterial color={WALL_COLOR} roughness={0.88} metalness={0.05} />
+      {/* Mountain peaks flanking the corridor */}
+      {peaks.map((p, i) => (
+        <group key={i} position={[p.x, 0, p.z]}>
+          {/* Rocky base cone */}
+          <mesh castShadow receiveShadow position={[0, p.h * 0.5, 0]}>
+            <coneGeometry args={[p.r, p.h, 8]} />
+            <meshStandardMaterial color={ROCK_COLOR} roughness={0.92} />
           </mesh>
-          {/* Snow on corner */}
-          <mesh position={[junc.x + sx * off, WALL_HEIGHT + SNH / 2, junc.z + sz * off]}>
-            <boxGeometry args={[WALL_THICKNESS + 2, SNH, WALL_THICKNESS + 2]} />
-            <meshStandardMaterial color={SNOW_COLOR} roughness={0.6} />
+          {/* Snow cap — upper 40% of the cone */}
+          <mesh castShadow position={[0, p.h * 0.78, 0]}>
+            <coneGeometry args={[p.r * 0.48, p.h * 0.44, 8]} />
+            <meshStandardMaterial color={SNOW_COLOR} roughness={0.55} />
           </mesh>
         </group>
       ))}
@@ -127,81 +106,40 @@ function CanyonJunction({ junc }) {
   )
 }
 
-// ── Icicles — instanced mesh over all wall tops ───────────────────────────────
-function Icicles() {
-  const meshRef = useRef()
-
-  // Build all icicle transforms once
-  const { positions, count } = useMemo(() => {
-    const rng = mulberry32(ICICLE_SEED)
-    const pts = []
-    const { segments } = CANYON_NETWORK
-
-    segments.forEach((seg) => {
-      const isNS = seg.dir === 0 || seg.dir === 2
-      const len  = seg.len
-
-      // 8 icicles per wall side per segment
-      for (let side = 0; side < 2; side++) {
-        const sign = side === 0 ? -1 : 1
-        for (let k = 0; k < 8; k++) {
-          const t       = (k + 0.3 + rng() * 0.4) / 8   // 0..1 along segment
-          const height  = 1.2 + rng() * 2.8              // icicle length
-          const spread  = (rng() - 0.5) * 1.0            // slight lateral spread
-          const wallOff = HALF_W + HALF_WT + spread
-
-          let x, z
-          if (isNS) {
-            x = (seg.x1 * (1 - t) + seg.x2 * t) + sign * wallOff
-            z = seg.z1 * (1 - t) + seg.z2 * t
-          } else {
-            x = seg.x1 * (1 - t) + seg.x2 * t
-            z = (seg.z1 * (1 - t) + seg.z2 * t) + sign * wallOff
-          }
-
-          pts.push({ x, z, height })
-        }
-      }
-    })
-
-    return { positions: pts, count: pts.length }
-  }, [])
-
-  useEffect(() => {
-    if (!meshRef.current || count === 0) return
-    const dummy = new THREE.Object3D()
-    positions.forEach((p, i) => {
-      // Icicle tip hangs down from wall top
-      dummy.position.set(p.x, WALL_HEIGHT - p.height / 2 + 0.3, p.z)
-      dummy.scale.set(0.15, p.height, 0.15)
-      dummy.updateMatrix()
-      meshRef.current.setMatrixAt(i, dummy.matrix)
-    })
-    meshRef.current.instanceMatrix.needsUpdate = true
-  }, [positions, count])
-
-  if (count === 0) return null
-
+// ── Junction floor pad — smooth tile at every segment end / turn ──────────────
+// Corner wall blocks are intentionally removed so all openings stay navigable.
+function CanyonJunction({ junc }) {
+  const padSize = CORRIDOR_WIDTH + 4   // slightly wider than corridor for visual continuity
   return (
-    <instancedMesh ref={meshRef} args={[null, null, count]} castShadow>
-      <coneGeometry args={[1, 1, 5]} />
-      <meshStandardMaterial
-        color={ICICLE_COLOR}
-        roughness={0.15}
-        metalness={0.3}
-        transparent
-        opacity={0.88}
-      />
-    </instancedMesh>
+    <mesh position={[junc.x, 0.15, junc.z]} receiveShadow>
+      <boxGeometry args={[padSize, 0.3, padSize]} />
+      <meshStandardMaterial color={FLOOR_COLOR} roughness={0.75} metalness={0.1} />
+    </mesh>
   )
 }
 
-// ── Snow drift accent strips along wall bases ─────────────────────────────────
+// ── Entry pad — placed at each arm's start (village→canyon threshold) ─────────
+// Gives a smooth floor tile at the corridor mouth so the opening looks inviting.
+function EntryPads() {
+  const padSize = CORRIDOR_WIDTH + 4
+  return (
+    <>
+      {ARM_STARTS.map((arm, i) => (
+        <mesh key={i} position={[arm.sx, 0.15, arm.sz]} receiveShadow>
+          <boxGeometry args={[padSize, 0.3, padSize]} />
+          <meshStandardMaterial color={FLOOR_COLOR} roughness={0.75} metalness={0.1} />
+        </mesh>
+      ))}
+    </>
+  )
+}
+
+// ── Instanced snow drifts along corridor floors ───────────────────────────────
 function SnowDrifts() {
   const meshRef = useRef()
 
   const { positions, count } = useMemo(() => {
-    const rng = mulberry32(ICICLE_SEED + 1)
+    const rng = mulberry32(88888)
     const pts = []
     const { segments } = CANYON_NETWORK
 
@@ -209,11 +147,10 @@ function SnowDrifts() {
       const isNS = seg.dir === 0 || seg.dir === 2
       for (let side = 0; side < 2; side++) {
         const sign = side === 0 ? -1 : 1
-        // 3 drifts per wall side
         for (let k = 0; k < 3; k++) {
-          const t    = (k + 0.2 + rng() * 0.6) / 3
-          const sc   = 1.5 + rng() * 2.5
-          const wallEdge = HALF_W + 0.3
+          const t  = (k + 0.2 + rng() * 0.6) / 3
+          const sc = 1.2 + rng() * 2.0
+          const wallEdge = HALF_W - 1.5   // edge of walkable floor
 
           let x, z
           if (isNS) {
@@ -235,8 +172,8 @@ function SnowDrifts() {
     if (!meshRef.current || count === 0) return
     const dummy = new THREE.Object3D()
     positions.forEach((p, i) => {
-      dummy.position.set(p.x, 0.25, p.z)
-      dummy.scale.set(p.sc, p.sc * 0.4, p.sc)
+      dummy.position.set(p.x, 0.22, p.z)
+      dummy.scale.set(p.sc, p.sc * 0.35, p.sc)
       dummy.updateMatrix()
       meshRef.current.setMatrixAt(i, dummy.matrix)
     })
@@ -265,18 +202,20 @@ export default function CanyonWorld() {
         <meshStandardMaterial color="#b5cfe0" roughness={0.85} />
       </mesh>
 
-      {/* Canyon corridor segments */}
+      {/* Canyon corridor segments (floor + mountain walls) */}
       {segments.map((seg, i) => (
         <CanyonSegment key={i} seg={seg} />
       ))}
 
-      {/* Junction pads at every turn */}
+      {/* Junction floor pads at every segment turn */}
       {junctions.map((junc, i) => (
         <CanyonJunction key={i} junc={junc} />
       ))}
 
-      {/* Decorative elements */}
-      <Icicles />
+      {/* Entry pads at the mouth of each arm (village → corridor) */}
+      <EntryPads />
+
+      {/* Snow drift accents along corridor floors */}
       <SnowDrifts />
     </group>
   )

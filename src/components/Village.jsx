@@ -280,9 +280,9 @@ export default function Village({ playerRef }) {
 
   return (
     <group>
-      {/* Ground snow layer for village */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, BASE - 0.02, 0]}>
-        <circleGeometry args={[34, 48]} />
+      {/* Ground snow layer for village — sits just above ice sheet to avoid Z-fighting */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+        <circleGeometry args={[36, 64]} />
         <meshStandardMaterial color="#deeef8" roughness={0.85} />
       </mesh>
 

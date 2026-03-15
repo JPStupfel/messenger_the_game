@@ -24,14 +24,14 @@ const DIR_VEC = [
 ]
 
 // ── Arm starting positions (one per cardinal direction) ──────────────────────
-const ARM_STARTS = [
+export const ARM_STARTS = [
   { sx:  0,                     sz: -VILLAGE_OPEN_RADIUS, dir: 0 },  // North
   { sx:  VILLAGE_OPEN_RADIUS,   sz:  0,                   dir: 1 },  // East
   { sx:  0,                     sz:  VILLAGE_OPEN_RADIUS,  dir: 2 },  // South
   { sx: -VILLAGE_OPEN_RADIUS,   sz:  0,                   dir: 3 },  // West
 ]
 
-const SEGS_PER_ARM  = 7    // segments per arm
+export const SEGS_PER_ARM  = 7    // segments per arm
 const SEG_LEN_MIN   = 34
 const SEG_LEN_MAX   = 55
 const TURN_PROB     = 0.50  // chance of turning (50% → turn, split 50/50 L vs R)
