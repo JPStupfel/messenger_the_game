@@ -85,10 +85,13 @@ export default function PathTrace({ playerRef, npcs, rescuedIds, followingIds, s
     const dz = targetZ - sz
     const totalDist = Math.sqrt(dx * dx + dz * dz)
 
-    // Start dots a bit ahead of the player so they don't overlap the character
-    const startOffset = 2.5
+    // Start dots just ahead of the player so they don't overlap the character
+    const startOffset = 1.5
     const visibleDist = Math.max(0, totalDist - startOffset)
-    const numDots = Math.min(MAX_DOTS, Math.floor(visibleDist / DOT_SPACING))
+    // Always show at least 1 dot while the target is reachable so the guide
+    // never vanishes before the player reaches the NPC / village.
+    const minDots = totalDist > startOffset ? 1 : 0
+    const numDots = Math.min(MAX_DOTS, Math.max(minDots, Math.floor(visibleDist / DOT_SPACING)))
 
     const nx = totalDist > 0 ? dx / totalDist : 0   // normalised direction
     const nz = totalDist > 0 ? dz / totalDist : 0
@@ -98,7 +101,9 @@ export default function PathTrace({ playerRef, npcs, rescuedIds, followingIds, s
 
     for (let i = 0; i < MAX_DOTS; i++) {
       if (i < numDots) {
-        const dist = startOffset + (i + 1) * DOT_SPACING
+        const rawDist = startOffset + (i + 1) * DOT_SPACING
+        // Clamp so the last dot never overshoots the target position
+        const dist = Math.min(rawDist, totalDist * 0.97)
         const wx = sx + nx * dist
         const wz = sz + nz * dist
         const wy = getTerrainHeight(noise, wx, wz) + 0.45
