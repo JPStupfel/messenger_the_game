@@ -2,7 +2,7 @@ import { useRef, useEffect, forwardRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GROUND_Y, PLAYER_HALF_HEIGHT, FLOATING_PLATFORMS } from '../gameData'
-import { keys } from '../keys'
+import { keys, touchInput } from '../keys'
 
 const SPEED = 7
 const JUMP_FORCE = 11
@@ -41,6 +41,11 @@ const Player = forwardRef(function Player(_, ref) {
     if (keys.has('KeyS') || keys.has('ArrowDown'))  moveDir.sub(camForward)
     if (keys.has('KeyA') || keys.has('ArrowLeft'))  moveDir.sub(camRight)
     if (keys.has('KeyD') || keys.has('ArrowRight')) moveDir.add(camRight)
+    // Touch virtual joystick: +moveY = dragged down = backward
+    if (touchInput.moveX !== 0 || touchInput.moveY !== 0) {
+      moveDir.addScaledVector(camRight,   touchInput.moveX)
+      moveDir.addScaledVector(camForward, -touchInput.moveY)
+    }
 
     if (moveDir.lengthSq() > 0) {
       moveDir.normalize()
@@ -96,9 +101,10 @@ const Player = forwardRef(function Player(_, ref) {
     }
 
     // ── Jump ─────────────────────────────────────────────────────────
-    if (keys.has('Space') && onGround.current) {
+    if ((keys.has('Space') || touchInput.jump) && onGround.current) {
       verticalVel.current = JUMP_FORCE
       onGround.current = false
+      touchInput.jump = false
     }
   })
 

@@ -7,11 +7,14 @@ import World from './World'
 import NPC from './NPC'
 import CollectableStar from './CollectableStar'
 import { NPCS, STARS } from '../gameData'
+import { touchInput } from '../keys'
 
 // ── Follow camera ─────────────────────────────────────────────────────────────
 const CAM_DISTANCE = 10
 const CAM_HEIGHT   = 4
 const CAM_LERP     = 0.1
+
+const TOUCH_JOYSTICK_RADIUS = 80  // px — how far to drag for full speed
 
 function FollowCamera({ playerRef }) {
   const { camera, gl } = useThree()
@@ -20,9 +23,15 @@ function FollowCamera({ playerRef }) {
   const isDragging = useRef(false)
   const lastMouse  = useRef({ x: 0, y: 0 })
 
+  // Touch tracking
+  const activeTouches   = useRef({})   // id → {x, y}
+  const singleStart     = useRef(null) // {x, y, time, maxMove}
+  const twoFingerLast   = useRef({ x: 0, y: 0 })
+
   useEffect(() => {
     const canvas = gl.domElement
 
+    // ── Mouse: camera orbit (desktop) ───────────────────────────────
     const onMouseDown = (e) => {
       isDragging.current = true
       lastMouse.current = { x: e.clientX, y: e.clientY }
@@ -37,24 +46,84 @@ function FollowCamera({ playerRef }) {
     }
     const onMouseUp = () => { isDragging.current = false }
 
-    // Touch support
+    // ── Touch ────────────────────────────────────────────────────────
     const onTouchStart = (e) => {
-      isDragging.current = true
-      lastMouse.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-    }
-    const onTouchMove = (e) => {
-      if (!isDragging.current) return
-      const dx = e.touches[0].clientX - lastMouse.current.x
-      const dy = e.touches[0].clientY - lastMouse.current.y
-      lastMouse.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-      yaw.current   -= dx * 0.005
-      pitch.current  = Math.max(0.05, Math.min(Math.PI * 0.45, pitch.current + dy * 0.005))
-    }
-    const onTouchEnd = () => { isDragging.current = false }
+      for (const t of e.changedTouches)
+        activeTouches.current[t.identifier] = { x: t.clientX, y: t.clientY }
 
-    // Scroll to zoom
-    const onWheel = (e) => {
-      // handled by adjusting distance — simple approach: shift pitch
+      const count = Object.keys(activeTouches.current).length
+      if (count === 1) {
+        const t = e.changedTouches[0]
+        singleStart.current = { x: t.clientX, y: t.clientY, time: Date.now(), maxMove: 0 }
+      } else {
+        // Moving to 2-finger mode — zero movement, prepare camera drag
+        touchInput.moveX = 0
+        touchInput.moveY = 0
+        singleStart.current = null
+        const ids = Object.keys(activeTouches.current)
+        twoFingerLast.current = {
+          x: (activeTouches.current[ids[0]].x + activeTouches.current[ids[1]].x) / 2,
+          y: (activeTouches.current[ids[0]].y + activeTouches.current[ids[1]].y) / 2,
+        }
+      }
+    }
+
+    const onTouchMove = (e) => {
+      for (const t of e.changedTouches)
+        if (activeTouches.current[t.identifier])
+          activeTouches.current[t.identifier] = { x: t.clientX, y: t.clientY }
+
+      const ids = Object.keys(activeTouches.current)
+
+      if (ids.length === 1 && singleStart.current) {
+        // ── 1 finger: virtual joystick → player movement ────────────
+        const pos = activeTouches.current[ids[0]]
+        const dx = pos.x - singleStart.current.x
+        const dy = pos.y - singleStart.current.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        singleStart.current.maxMove = Math.max(singleStart.current.maxMove, dist)
+        touchInput.moveX = Math.max(-1, Math.min(1, dx / TOUCH_JOYSTICK_RADIUS))
+        touchInput.moveY = Math.max(-1, Math.min(1, dy / TOUCH_JOYSTICK_RADIUS)) // +Y = drag down = backward
+
+      } else if (ids.length >= 2) {
+        // ── 2 fingers: camera rotation ──────────────────────────────
+        touchInput.moveX = 0
+        touchInput.moveY = 0
+        const midX = (activeTouches.current[ids[0]].x + activeTouches.current[ids[1]].x) / 2
+        const midY = (activeTouches.current[ids[0]].y + activeTouches.current[ids[1]].y) / 2
+        const dx = midX - twoFingerLast.current.x
+        const dy = midY - twoFingerLast.current.y
+        twoFingerLast.current = { x: midX, y: midY }
+        yaw.current   -= dx * 0.005
+        pitch.current  = Math.max(0.05, Math.min(Math.PI * 0.45, pitch.current + dy * 0.005))
+      }
+    }
+
+    const onTouchEnd = (e) => {
+      for (const t of e.changedTouches)
+        delete activeTouches.current[t.identifier]
+
+      const remaining = Object.keys(activeTouches.current).length
+      if (remaining === 0) {
+        // Detect tap → jump
+        if (singleStart.current) {
+          const elapsed = Date.now() - singleStart.current.time
+          if (elapsed < 250 && singleStart.current.maxMove < 15) {
+            touchInput.jump = true
+            setTimeout(() => { touchInput.jump = false }, 150)
+          }
+        }
+        touchInput.moveX = 0
+        touchInput.moveY = 0
+        singleStart.current = null
+      } else if (remaining === 1) {
+        // Dropped back to 1 finger — restart joystick from current position
+        touchInput.moveX = 0
+        touchInput.moveY = 0
+        const id = Object.keys(activeTouches.current)[0]
+        const pos = activeTouches.current[id]
+        singleStart.current = { x: pos.x, y: pos.y, time: Date.now(), maxMove: 0 }
+      }
     }
 
     canvas.addEventListener('mousedown',  onMouseDown)
@@ -64,6 +133,7 @@ function FollowCamera({ playerRef }) {
     canvas.addEventListener('touchstart', onTouchStart, { passive: true })
     canvas.addEventListener('touchmove',  onTouchMove,  { passive: true })
     canvas.addEventListener('touchend',   onTouchEnd)
+    canvas.addEventListener('touchcancel', onTouchEnd)
     return () => {
       canvas.removeEventListener('mousedown',  onMouseDown)
       canvas.removeEventListener('mousemove',  onMouseMove)
@@ -72,6 +142,7 @@ function FollowCamera({ playerRef }) {
       canvas.removeEventListener('touchstart', onTouchStart)
       canvas.removeEventListener('touchmove',  onTouchMove)
       canvas.removeEventListener('touchend',   onTouchEnd)
+      canvas.removeEventListener('touchcancel', onTouchEnd)
     }
   }, [gl])
 
