@@ -7,3 +7,8 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
 }
+
+/* Prevent the browser from intercepting touch gestures on the 3D canvas */
+canvas {
+  touch-action: none;
+}

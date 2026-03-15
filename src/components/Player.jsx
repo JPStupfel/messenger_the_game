@@ -2,13 +2,12 @@ import { useRef, useEffect, forwardRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GROUND_Y, PLAYER_HALF_HEIGHT, FLOATING_PLATFORMS } from '../gameData'
+import { keys } from '../keys'
 
 const SPEED = 7
 const JUMP_FORCE = 11
 const GRAVITY = -22
 const MAIN_ISLAND_RADIUS = 23
-
-const keys = new Set()
 
 const Player = forwardRef(function Player(_, ref) {
   const { camera } = useThree()
