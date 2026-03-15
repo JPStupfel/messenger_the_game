@@ -96,25 +96,6 @@ function FloatingRock({ position, rx, h, color, accent }) {
   )
 }
 
-// Spinning star collectible
-function StarOrb({ position }) {
-  const ref = useRef()
-  useFrame(({ clock }) => {
-    if (!ref.current) return
-    ref.current.rotation.y = clock.getElapsedTime() * 1.5
-    ref.current.position.y = position[1] + Math.sin(clock.getElapsedTime() * 2) * 0.2
-  })
-  return (
-    <group ref={ref} position={position}>
-      <mesh castShadow>
-        <octahedronGeometry args={[0.4, 0]} />
-        <meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.8} />
-      </mesh>
-      <pointLight color="#fbbf24" intensity={1.5} distance={4} />
-    </group>
-  )
-}
-
 // Animated magic portal ring
 function Portal({ position }) {
   const ref = useRef()
@@ -223,18 +204,12 @@ export default function World() {
         <Crystal position={[0.9, 0.6, 0]} color="#fb7185" height={1.4} rotation={[0.3, 0, 0.2]} />
       </group>
 
-      {/* Floating star orbs scattered around */}
-      <StarOrb position={[8, 3, 8]}  />
-      <StarOrb position={[-9, 3, -7]} />
-      <StarOrb position={[2, 3, -17]} />
-
       {/* Floating island platforms */}
       {FLOATING_PLATFORMS.map((p) => (
         <group key={p.id}>
           <FloatingRock position={[p.x, p.y, p.z]} rx={p.rx} h={p.h} color={p.color} accent={p.accent} />
           {/* Small tree on each platform */}
           <Tree position={[p.x + 1, p.y + p.h / 2 + 0.3, p.z + 1]} scale={0.5} />
-          <StarOrb position={[p.x - 1.5, p.y + p.h / 2 + 2.5, p.z]} />
         </group>
       ))}
 

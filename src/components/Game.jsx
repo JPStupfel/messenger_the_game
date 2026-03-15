@@ -4,6 +4,9 @@ import { Sky, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import Player from './Player'
 import World from './World'
+import NPC from './NPC'
+import CollectableStar from './CollectableStar'
+import { NPCS, STARS } from '../gameData'
 
 // ── Follow camera ─────────────────────────────────────────────────────────────
 const CAM_DISTANCE = 10
@@ -95,7 +98,7 @@ function FollowCamera({ playerRef }) {
 }
 
 // ── Game scene ────────────────────────────────────────────────────────────────
-export default function Game() {
+export default function Game({ onStarCollect }) {
   const playerRef = useRef()
 
   return (
@@ -137,6 +140,12 @@ export default function Game() {
       {/* Scene */}
       <Player ref={playerRef} />
       <World />
+      {STARS.map((star) => (
+        <CollectableStar key={star.id} data={star} playerRef={playerRef} onCollect={onStarCollect} />
+      ))}
+      {NPCS.map((npc) => (
+        <NPC key={npc.id} data={npc} playerRef={playerRef} />
+      ))}
     </>
   )
 }

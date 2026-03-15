@@ -1,4 +1,5 @@
-export default function HUD() {
+export default function HUD({ collected, total }) {
+  const allCollected = collected === total
   return (
     <div className="absolute inset-0 pointer-events-none select-none">
       {/* Title */}
@@ -6,6 +7,16 @@ export default function HUD() {
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] tracking-wide">
           ✨ Fantasy Island
         </h1>
+      </div>
+
+      {/* Star counter — top right */}
+      <div className={`absolute top-4 right-5 flex items-center gap-2 px-4 py-2 rounded-2xl font-bold text-lg shadow-lg border backdrop-blur-sm transition-all
+        ${ allCollected
+          ? 'bg-yellow-400/90 text-yellow-900 border-yellow-500 scale-110'
+          : 'bg-black/50 text-yellow-300 border-yellow-500/40'
+        }`}>
+        ⭐ {collected} / {total}
+        {allCollected && <span className="ml-1 animate-bounce">🎉</span>}
       </div>
 
       {/* Controls legend — bottom left */}
@@ -17,10 +28,10 @@ export default function HUD() {
       </div>
 
       {/* Tip bubble — bottom right */}
-      <div className="absolute bottom-5 right-5 bg-purple-900/60 text-purple-100 rounded-2xl px-4 py-3 text-sm font-semibold backdrop-blur-sm border border-purple-400/30 max-w-[180px] text-center">
+      <div className="absolute bottom-5 right-5 bg-purple-900/60 text-purple-100 rounded-2xl px-4 py-3 text-sm font-semibold backdrop-blur-sm border border-purple-400/30 max-w-[190px] text-center">
         🌟 Collect the golden stars!
         <br />
-        <span className="text-purple-300 text-xs">Jump to floating islands</span>
+        <span className="text-purple-300 text-xs">Walk up to people to chat 💬</span>
       </div>
     </div>
   )
