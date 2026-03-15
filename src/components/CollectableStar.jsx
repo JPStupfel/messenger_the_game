@@ -1,8 +1,10 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { createNoise2D, getTerrainHeight, WORLD_SEED } from './ProceduralWorld'
 
 const COLLECT_DIST = 2.2
+const HOVER_HEIGHT = 2  // How high above terrain stars float
 
 const _starPos   = new THREE.Vector3()
 const _playerPos = new THREE.Vector3()
@@ -44,6 +46,14 @@ export default function CollectableStar({ data, playerRef, onCollect }) {
   const [bursting, setBursting]   = useState(false)
   const [collected, setCollected] = useState(false)
   const triggered   = useRef(false)
+  
+  // Calculate position on terrain
+  const noise = useMemo(() => createNoise2D(WORLD_SEED), [])
+  const position = useMemo(() => {
+    const [x, yOffset, z] = data.position
+    const terrainY = getTerrainHeight(noise, x, z)
+    return [x, terrainY + HOVER_HEIGHT + yOffset, z]
+  }, [data.position, noise])
 
   useFrame(({ clock }) => {
     if (!groupRef.current || triggered.current) return
@@ -51,10 +61,10 @@ export default function CollectableStar({ data, playerRef, onCollect }) {
 
     // Animate: spin + bob
     groupRef.current.rotation.y = clock.getElapsedTime() * 1.5
-    groupRef.current.position.y = data.position[1] + Math.sin(clock.getElapsedTime() * 2.2) * 0.22
+    groupRef.current.position.y = position[1] + Math.sin(clock.getElapsedTime() * 2.2) * 0.22
 
     // Proximity check
-    _starPos.set(...data.position)
+    _starPos.set(...position)
     _playerPos.copy(playerRef.current.position)
     const dist = _starPos.distanceTo(_playerPos)
 
@@ -73,11 +83,11 @@ export default function CollectableStar({ data, playerRef, onCollect }) {
   return (
     <>
       {/* Burst stays at fixed world position while expanding */}
-      {bursting && <Burst position={data.position} />}
+      {bursting && <Burst position={position} />}
 
       {/* Star orb — hidden instantly when bursting */}
       {!bursting && (
-        <group ref={groupRef} position={data.position}>
+        <group ref={groupRef} position={position}>
           <mesh castShadow>
             <octahedronGeometry args={[0.4, 0]} />
             <meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.9} />

@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Sky, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import Player from './Player'
-import World from './World'
+import ProceduralWorld from './ProceduralWorld'
 import NPC from './NPC'
 import CollectableStar from './CollectableStar'
 import YetiFriend from './YetiFriend'
@@ -211,7 +211,7 @@ export default function Game({ onStarCollect }) {
 
       {/* Scene */}
       <Player ref={playerRef} />
-      <World />
+      <ProceduralWorld playerRef={playerRef} />
       {STARS.map((star) => (
         <CollectableStar key={star.id} data={star} playerRef={playerRef} onCollect={onStarCollect} />
       ))}

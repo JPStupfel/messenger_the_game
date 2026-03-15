@@ -1,7 +1,8 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
+import { createNoise2D, getTerrainHeight, WORLD_SEED } from './ProceduralWorld'
 
 const TALK_DISTANCE = 5
 const LINE_INTERVAL = 3.2   // seconds per line
@@ -17,6 +18,14 @@ export default function NPC({ data, playerRef }) {
   const lineIndex  = useRef(0)
   const [near, setNear]       = useState(false)
   const [lineText, setLineText] = useState(data.lines[0])
+  
+  // Calculate position on terrain
+  const noise = useMemo(() => createNoise2D(WORLD_SEED), [])
+  const position = useMemo(() => {
+    const [x, _y, z] = data.position
+    const terrainY = getTerrainHeight(noise, x, z)
+    return [x, terrainY, z]
+  }, [data.position, noise])
 
   useFrame(({ clock }, delta) => {
     if (!groupRef.current || !playerRef?.current) return
@@ -66,7 +75,7 @@ export default function NPC({ data, playerRef }) {
   })
 
   return (
-    <group ref={groupRef} position={data.position}>
+    <group ref={groupRef} position={position}>
       {/* ── Character mesh ─────────────────────────────────────── */}
       <group ref={bodyRef}>
         {/* Body */}

@@ -10,87 +10,86 @@ export const FLOATING_PLATFORMS = [
   { id: 'p4', x: -8,  y: 20, z: -20, rx: 4.5,h: 2,  color: '#bfdbfe', accent: '#60a5fa' },
 ]
 
-// Ground-level stars + one per floating platform
+// Ground-level stars spread across the world (y value is offset above terrain)
 export const STARS = [
-  { id: 's1', position: [8,    3,    8]   },
-  { id: 's2', position: [-9,   3,   -7]   },
-  { id: 's3', position: [2,    3,  -17]   },
-  { id: 's4', position: [12.5, 11.5, -10] },
-  { id: 's5', position: [-17.5,15.5,  6]  },
-  { id: 's6', position: [2.5,  19.5, 18]  },
-  { id: 's7', position: [-9.5, 23.5,-20]  },
+  { id: 's1', position: [8,    1,    8]   },   // Near spawn
+  { id: 's2', position: [-12,  1,   -10]  },   // Nearby
+  { id: 's3', position: [20,   1,  -25]   },   // Further out
+  { id: 's4', position: [-30,  2,   15]   },   // In a different direction
+  { id: 's5', position: [45,   3,   40]   },   // Far exploration reward
+  { id: 's6', position: [-50,  3,  -45]   },   // Far corner
+  { id: 's7', position: [70,   4,  -60]   },   // Very far - adventure reward
 ]
 
 export const NPCS = [
   {
     id: 'yeti',
     name: '🏔️ Yuki the Yeti',
-    position: [7, 0, -3],
+    position: [10, 0, -8],
     bodyColor: '#e0f2fe',
     hatColor: '#7dd3fc',
     skinColor: '#f0f9ff',
     lines: [
-      'Welcome to the Frozen Peaks! ❄️',
+      'Welcome to the endless snowlands! ❄️',
       'Your snowboard is magical!',
-      'Collect those golden stars!',
-      'The ice palace holds secrets...',
+      'Explore far and collect stars!',
+      'Crystal fields lie to the east...',
     ],
   },
   {
     id: 'penguin',
     name: '🐧 Captain Waddle',
-    position: [-7, 0, -3],
+    position: [-15, 0, 5],
     bodyColor: '#1e293b',
     hatColor: '#f97316',
     skinColor: '#f8fafc',
     lines: [
       'Ahoy, young explorer!',
-      'I sailed the frozen seas!',
-      'Watch out for slippery slopes!',
+      'Frozen lakes are to the north!',
+      'Keep flying with that spacebar!',
       'Your board glows with magic! ✨',
     ],
   },
   {
     id: 'fox',
     name: '🦊 Frosty',
-    position: [-14, 0, 10],
+    position: [-25, 0, -20],
     bodyColor: '#f97316',
     hatColor: '#ea580c',
     skinColor: '#fef3c7',
     lines: [
       'Hi hi! Love your red hair! 🧡',
-      'I know all the best jumps!',
-      'The aurora is so pretty tonight!',
-      'Race you to the top! 🏂',
+      'The forest is full of secrets!',
+      'Mountains rise to the south!',
+      'Race you to the horizon! 🏂',
     ],
   },
   {
     id: 'walrus',
     name: '🦭 Old Whiskers',
-    position: [14, 0, 10],
+    position: [30, 0, 25],
     bodyColor: '#78716c',
     hatColor: '#57534e',
     skinColor: '#d6d3d1',
     lines: [
       'Greetings, little snowboarder!',
-      'I\'ve seen a hundred winters.',
-      'The floating ice holds treasures.',
+      'I\'ve explored for miles!',
+      'The world goes on forever...',
       'Ride bravely, young one! 🌟',
     ],
   },
   {
-    // On floating platform p1: x=14, y=8, z=-10  surface y=9
     id: 'owl',
     name: '🦉 Aurora',
-    position: [14, 9, -10],
+    position: [50, 0, -40],
     bodyColor: '#dbeafe',
     hatColor: '#93c5fd',
     skinColor: '#f0f9ff',
     lines: [
-      'Hoo! You made it up here!',
-      'The view is breathtaking! 🌄',
+      'Hoo! You found me out here!',
+      'The crystal fields sparkle! 💎',
       'I watch the northern lights.',
-      'Your magic board amazes me! ✨',
+      'Adventure awaits everywhere! ✨',
     ],
   },
 ]

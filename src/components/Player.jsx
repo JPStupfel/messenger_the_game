@@ -1,14 +1,17 @@
-import { useRef, useEffect, forwardRef } from 'react'
+import { useRef, useEffect, forwardRef, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { GROUND_Y, PLAYER_HALF_HEIGHT, FLOATING_PLATFORMS } from '../gameData'
+import { PLAYER_HALF_HEIGHT  } from '../gameData'
 import { keys, touchInput } from '../keys'
+import { createNoise2D, getTerrainHeight, getTerrainGradient, WORLD_SEED } from './ProceduralWorld'
 
-const SPEED = 7
-const JUMP_FORCE = 11
-const GRAVITY = -22
-const GLIDE_GRAVITY = -5
-const MAIN_ISLAND_RADIUS = 23
+const SPEED = 8
+const JUMP_FORCE = 14
+const GRAVITY = -28
+const GLIDE_GRAVITY = -6
+const SLIDE_ACCELERATION = 25  // How fast you accelerate downhill
+const SLIDE_FRICTION = 0.92     // Friction when sliding (lower = more slide)
+const MAX_SLIDE_SPEED = 35      // Terminal sliding velocity
 
 // Skin material with subtle warmth
 const skinMat = { color: '#f5d0c5', roughness: 0.7, metalness: 0 }
@@ -22,8 +25,12 @@ const hairHighlight = '#fca5a5'
 const Player = forwardRef(function Player(_, ref) {
   const { camera } = useThree()
   const verticalVel = useRef(0)
+  const slideVel = useRef({ x: 0, z: 0 })  // Horizontal sliding velocity
   const onGround = useRef(true)
   const canJump = useRef(true)  // Tracks if space has been released
+  
+  // Noise function for terrain height (same seed as world)
+  const noise = useMemo(() => createNoise2D(WORLD_SEED), [])
   
   // Animation refs
   const bodyRef = useRef()
@@ -107,43 +114,67 @@ const Player = forwardRef(function Player(_, ref) {
       scarfRef.current.rotation.y = Math.sin(swayPhase.current * 0.9) * scarfSway * 0.3
     }
 
-    // ── World boundary (keep on main island disk) ────────────────────
-    const horiz = new THREE.Vector2(mesh.position.x, mesh.position.z)
-    if (horiz.length() > MAIN_ISLAND_RADIUS) {
-      horiz.normalize().multiplyScalar(MAIN_ISLAND_RADIUS)
-      mesh.position.x = horiz.x
-      mesh.position.z = horiz.y
-    }
-
     // ── Gravity ──────────────────────────────────────────────────────
     verticalVel.current += GRAVITY * delta
     mesh.position.y += verticalVel.current * delta
 
-    // ── Collision: main island ───────────────────────────────────────
+    // ── Collision: procedural terrain ────────────────────────────────
     onGround.current = false
-    const groundSurface = GROUND_Y + PLAYER_HALF_HEIGHT
+    const terrainHeight = getTerrainHeight(noise, mesh.position.x, mesh.position.z)
+    const groundSurface = terrainHeight + PLAYER_HALF_HEIGHT
     if (mesh.position.y <= groundSurface) {
       mesh.position.y = groundSurface
       verticalVel.current = 0
       onGround.current = true
     }
 
-    // ── Collision: floating platforms ────────────────────────────────
-    for (const p of FLOATING_PLATFORMS) {
-      const dx = mesh.position.x - p.x
-      const dz = mesh.position.z - p.z
-      const dist2 = dx * dx + dz * dz
-      const platSurface = p.y + p.h / 2 + PLAYER_HALF_HEIGHT
-      if (dist2 < p.rx * p.rx && verticalVel.current <= 0 && mesh.position.y >= platSurface - 0.3) {
-        mesh.position.y = platSurface
-        verticalVel.current = 0
-        onGround.current = true
+    // ── Slope sliding physics ────────────────────────────────────────
+    if (onGround.current) {
+      const gradient = getTerrainGradient(noise, mesh.position.x, mesh.position.z)
+      
+      // Apply sliding force based on slope steepness
+      if (gradient.steepness > 0.1) {  // Only slide on noticeable slopes
+        // Accelerate downhill
+        slideVel.current.x += gradient.x * SLIDE_ACCELERATION * delta
+        slideVel.current.z += gradient.z * SLIDE_ACCELERATION * delta
+        
+        // Cap max speed
+        const slideSpeed = Math.sqrt(slideVel.current.x ** 2 + slideVel.current.z ** 2)
+        if (slideSpeed > MAX_SLIDE_SPEED) {
+          const scale = MAX_SLIDE_SPEED / slideSpeed
+          slideVel.current.x *= scale
+          slideVel.current.z *= scale
+        }
       }
+      
+      // Apply friction (less on steep slopes)
+      const frictionMult = Math.max(0.8, SLIDE_FRICTION - gradient.steepness * 0.1)
+      slideVel.current.x *= frictionMult
+      slideVel.current.z *= frictionMult
+      
+      // Apply slide velocity to position
+      mesh.position.x += slideVel.current.x * delta
+      mesh.position.z += slideVel.current.z * delta
+      
+      // Tilt board based on slope
+      if (bodyRef.current && gradient.steepness > 0.05) {
+        const tiltAngle = Math.atan2(gradient.z, gradient.x)
+        bodyRef.current.rotation.x = THREE.MathUtils.lerp(
+          bodyRef.current.rotation.x, 
+          gradient.steepness * 0.3, 
+          0.1
+        )
+      }
+    } else {
+      // In air - reduce slide velocity slowly (air resistance)
+      slideVel.current.x *= 0.995
+      slideVel.current.z *= 0.995
     }
 
     // ── Fall off world → respawn ──────────────────────────────────────
-    if (mesh.position.y < -20) {
-      mesh.position.set(0, groundSurface, 0)
+    if (mesh.position.y < -50) {
+      const spawnHeight = getTerrainHeight(noise, 0, 0) + PLAYER_HALF_HEIGHT
+      mesh.position.set(0, spawnHeight + 2, 0)
       mesh.rotation.y = 0
       verticalVel.current = 0
     }
@@ -177,7 +208,7 @@ const Player = forwardRef(function Player(_, ref) {
   })
 
   return (
-    <group ref={ref} position={[0, GROUND_Y + PLAYER_HALF_HEIGHT, 0]}>
+    <group ref={ref} position={[0, 5, 0]}>
       
       {/* ════════════════════════════════════════════════════════════════
           MAGIC SNOWBOARD - detailed with bindings and glow effects

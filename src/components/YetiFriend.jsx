@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { GROUND_Y } from '../gameData'
+import { createNoise2D, getTerrainHeight, WORLD_SEED } from './ProceduralWorld'
 
 const BEFRIEND_DIST = 3.5   // get this close to befriend
 const FOLLOW_DIST   = 2.5   // how close yeti stays when following
@@ -18,14 +18,20 @@ export default function YetiFriend({ startPosition, playerRef }) {
   const [befriended, setBefriended] = useState(false)
   const [showHeart, setShowHeart]   = useState(false)
   const hopPhase = useRef(0)
+  
+  // Noise for terrain height
+  const noise = useMemo(() => createNoise2D(WORLD_SEED), [])
 
   useFrame(({ clock }, delta) => {
     if (!groupRef.current || !playerRef?.current) return
     const yeti   = groupRef.current
     const player = playerRef.current
 
+    // Get terrain height at yeti position
+    const terrainY = getTerrainHeight(noise, yeti.position.x, yeti.position.z)
+
     _playerPos.copy(player.position)
-    _yetiPos.set(yeti.position.x, GROUND_Y, yeti.position.z)
+    _yetiPos.set(yeti.position.x, terrainY, yeti.position.z)
 
     const dist = _playerPos.distanceTo(_yetiPos)
 
@@ -38,7 +44,7 @@ export default function YetiFriend({ startPosition, playerRef }) {
 
     // ── Idle bounce ──────────────────────────────────────────
     const bounce = Math.sin(clock.getElapsedTime() * 3) * 0.08
-    yeti.position.y = GROUND_Y + 0.45 + bounce
+    yeti.position.y = terrainY + 0.45 + bounce
 
     // ── Following behavior ───────────────────────────────────
     if (befriended) {
@@ -62,7 +68,7 @@ export default function YetiFriend({ startPosition, playerRef }) {
 
         // Hopping while moving
         hopPhase.current += delta * 12
-        yeti.position.y += Math.abs(Math.sin(hopPhase.current)) * HOP_HEIGHT
+        yeti.position.y = terrainY + 0.45 + Math.abs(Math.sin(hopPhase.current)) * HOP_HEIGHT
       } else {
         hopPhase.current = 0
       }
@@ -72,8 +78,14 @@ export default function YetiFriend({ startPosition, playerRef }) {
     }
   })
 
+  // Calculate initial position on terrain
+  const initialPosition = useMemo(() => {
+    const y = getTerrainHeight(noise, startPosition[0], startPosition[2])
+    return [startPosition[0], y + 0.45, startPosition[2]]
+  }, [startPosition, noise])
+
   return (
-    <group ref={groupRef} position={[startPosition[0], GROUND_Y + 0.45, startPosition[2]]}>
+    <group ref={groupRef} position={initialPosition}>
       {/* ══ BODY — round fluffy yeti ══ */}
       <mesh castShadow>
         <sphereGeometry args={[0.38, 12, 12]} />
