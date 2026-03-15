@@ -14,6 +14,7 @@ import {
   CORRIDOR_TOL,
   ARM_STARTS,
   SEGS_PER_ARM,
+  isInCorridorOrVillage,
 } from '../canyonGen'
 import { mulberry32 } from '../worldGen'
 
@@ -58,6 +59,8 @@ function mountainsForSide(seg, side, rng) {
       x = seg.x1 * (1 - t) + seg.x2 * t + jitter
       z = (seg.z1 * (1 - t) + seg.z2 * t) + sign * lateralOff
     }
+    // Skip mountains whose centre is inside the explorable corridor/village area
+    if (isInCorridorOrVillage(x, z)) continue
     peaks.push({ x, z, r, h })
   }
   return peaks
