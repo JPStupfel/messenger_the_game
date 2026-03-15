@@ -10,89 +10,112 @@ export const FLOATING_PLATFORMS = [
   { id: 'p4', x: -8,  y: 20, z: -20, rx: 4.5,h: 2,  color: '#bfdbfe', accent: '#60a5fa' },
 ]
 
-// Stars scattered beyond the village — collect them and bring them back to the well!
-export const STARS = [
-  { id: 's1',  position: [55,   1,   20]  },  // East meadow
-  { id: 's2',  position: [-60,  1,   15]  },  // West fields
-  { id: 's3',  position: [40,   1,  -55]  },  // South valley
-  { id: 's4',  position: [-35,  2,  -60]  },  // Southwest slopes
-  { id: 's5',  position: [70,   3,   55]  },  // Far northeast
-  { id: 's6',  position: [-75,  3,  -50]  },  // Far southwest
-  { id: 's7',  position: [90,   4,  -70]  },  // Very far explorer reward
-  { id: 's8',  position: [-55,  2,   65]  },  // Far northwest
-  { id: 's9',  position: [30,   1,   70]  },  // North forest
-  { id: 's10', position: [-80,  3,   30]  },  // West mountains
-]
-
+// Villagers lost in last night's blizzard — find them and lead them home!
+// villageSpot: [x, z] where each NPC hangs out once rescued
 export const NPCS = [
   {
     id: 'yeti',
-    name: '🏔️ Yuki the Yeti',
+    name: '🏔️ Yuki',
     position: [55, 0, -30],
+    villageSpot: [5, -4],
     bodyColor: '#e0f2fe',
     hatColor: '#7dd3fc',
     skinColor: '#f0f9ff',
     lines: [
-      'Welcome to the endless snowlands! ❄️',
-      'Your snowboard is magical!',
-      'Collect stars and wish at the well!',
-      'Crystal fields lie to the east...',
+      'I\'m so lost! The blizzard took me! 😰',
+      'Please help me find the village!',
+      'I can\'t feel my toes... brr! 🥶',
+      'The snow all looks the same! Help!',
+    ],
+    rescuedLines: [
+      'Thank you for finding me! ❄️',
+      'Home sweet home at last! 🏠',
+      'You\'re the best explorer ever! ⭐',
+      'Warm fires and hot cocoa! ☕',
     ],
   },
   {
     id: 'penguin',
     name: '🐧 Captain Waddle',
     position: [-55, 0, 35],
+    villageSpot: [-5, 3],
     bodyColor: '#1e293b',
     hatColor: '#f97316',
     skinColor: '#f8fafc',
     lines: [
-      'Ahoy, young explorer!',
-      'Frozen lakes are to the north!',
-      'Keep flying with that spacebar!',
-      'Your board glows with magic! ✨',
+      'Mayday! I\'m adrift in the snow! 🆘',
+      'Even a captain can get lost!',
+      'Lead the way, young explorer!',
+      'I can\'t find the lighthouse! 🌊',
+    ],
+    rescuedLines: [
+      'Land ho! Back to the village! ⚓',
+      'You navigated perfectly! 🧭',
+      'Ahoy, safe and sound! 🐧',
+      'You\'re my hero! 🎖️',
     ],
   },
   {
     id: 'fox',
-    name: '🦊 Frosty',
+    name: '🦊 Frostpaw',
     position: [-45, 0, -55],
+    villageSpot: [4, 5],
     bodyColor: '#f97316',
     hatColor: '#ea580c',
     skinColor: '#fef3c7',
     lines: [
-      'Hi hi! Love your red hair! 🧡',
-      'The forest is full of secrets!',
-      'Mountains rise to the south!',
-      'Race you to the horizon! 🏂',
+      'Oh no, I\'m lost in the storm! 😿',
+      'My paws are frozen! 🥶',
+      'I can\'t smell the village anymore!',
+      'Please take me home! 🏠',
+    ],
+    rescuedLines: [
+      'Yay yay yay! I\'m home! 🧡',
+      'You found me! You\'re amazing!',
+      'My paws are warming up! 🦊',
+      'Let\'s never go out in a blizzard again!',
     ],
   },
   {
     id: 'walrus',
     name: '🦭 Old Whiskers',
     position: [65, 0, 50],
+    villageSpot: [-4, -5],
     bodyColor: '#78716c',
     hatColor: '#57534e',
     skinColor: '#d6d3d1',
     lines: [
-      'Greetings, little snowboarder!',
-      'I\'ve explored for miles!',
-      'The world goes on forever...',
-      'Ride bravely, young one! 🌟',
+      'In 40 years, I\'ve never been this lost!',
+      'The blizzard came so suddenly... 🌨️',
+      'My old bones are freezing! 🥶',
+      'Young one, please guide me home!',
+    ],
+    rescuedLines: [
+      'Back home at my age! 🎉',
+      'Bless you, kind snowboarder! 🌟',
+      'I\'ll make you my famous fish stew!',
+      'The finest explorer I ever met! 🦭',
     ],
   },
   {
     id: 'owl',
     name: '🦉 Aurora',
     position: [80, 0, -65],
+    villageSpot: [6, 1],
     bodyColor: '#dbeafe',
     hatColor: '#93c5fd',
     skinColor: '#f0f9ff',
     lines: [
-      'Hoo! You found me out here!',
-      'The crystal fields sparkle! 💎',
-      'I watch the northern lights.',
-      'Adventure awaits everywhere! ✨',
+      'Hoo hoo! I can\'t see in this blizzard!',
+      'Even my owl eyes are useless! 😱',
+      'The snow swallowed my path home!',
+      'Please lead me back, brave one! 🦉',
+    ],
+    rescuedLines: [
+      'Hoo hoo hooray! I\'m home! 🎊',
+      'You guided me through the storm! ✨',
+      'Wisest snowboarder I\'ve ever met!',
+      'The northern lights welcome you! 💎',
     ],
   },
 ]

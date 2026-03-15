@@ -4,11 +4,12 @@ import { Sky, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 import Player from './Player'
 import ProceduralWorld from './ProceduralWorld'
-import NPC from './NPC'
-import CollectableStar from './CollectableStar'
+import LostNPC from './LostNPC'
+import VillageResident from './VillageResident'
+import PathTrace from './PathTrace'
 import YetiFriend from './YetiFriend'
 import Village from './Village'
-import { NPCS, STARS } from '../gameData'
+import { NPCS } from '../gameData'
 import { touchInput } from '../keys'
 
 // ── Follow camera ─────────────────────────────────────────────────────────────
@@ -171,7 +172,7 @@ function FollowCamera({ playerRef }) {
 }
 
 // ── Game scene ────────────────────────────────────────────────────────────────
-export default function Game({ onStarCollect, carrying, onDeposit, onNearWellChange, returnTriggerRef }) {
+export default function Game({ rescuedIds, followingIds, showPath, onStartFollowing, onRescue, returnTriggerRef }) {
   const playerRef = useRef()
 
   return (
@@ -213,20 +214,35 @@ export default function Game({ onStarCollect, carrying, onDeposit, onNearWellCha
       {/* Scene */}
       <Player ref={playerRef} returnTriggerRef={returnTriggerRef} />
       <ProceduralWorld playerRef={playerRef} />
-      <Village
-        playerRef={playerRef}
-        carrying={carrying}
-        onDeposit={onDeposit}
-        onNearWellChange={onNearWellChange}
-      />
-      {STARS.map((star) => (
-        <CollectableStar key={star.id} data={star} playerRef={playerRef} onCollect={onStarCollect} />
-      ))}
+      <Village playerRef={playerRef} />
+
+      {/* Lost NPCs — go find them and lead them home! */}
       {NPCS.map((npc) => (
-        <NPC key={npc.id} data={npc} playerRef={playerRef} />
+        <LostNPC
+          key={npc.id}
+          data={npc}
+          playerRef={playerRef}
+          isRescued={rescuedIds.includes(npc.id)}
+          onStartFollowing={onStartFollowing}
+          onRescue={onRescue}
+        />
       ))}
 
-      {/* Little yeti companion — befriend it and it follows you! */}
+      {/* Rescued NPCs hanging out in the village */}
+      {NPCS.filter((npc) => rescuedIds.includes(npc.id)).map((npc) => (
+        <VillageResident key={`resident-${npc.id}`} data={npc} index={NPCS.indexOf(npc)} />
+      ))}
+
+      {/* Path guide dots — shows route to next NPC or back to village */}
+      <PathTrace
+        playerRef={playerRef}
+        npcs={NPCS}
+        rescuedIds={rescuedIds}
+        followingIds={followingIds}
+        showPath={showPath}
+      />
+
+      {/* Little yeti companion — always following! */}
       <YetiFriend startPosition={[5, 0, 6]} playerRef={playerRef} />
     </>
   )
