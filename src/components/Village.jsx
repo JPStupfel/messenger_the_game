@@ -123,12 +123,12 @@ function TownSquare() {
   return (
     <>
       {/* Cobblestone floor */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, VILLAGE_Y + 0.01, 0]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, VILLAGE_Y + 0.02, 0]}>
         <circleGeometry args={[9, 32]} />
         <meshStandardMaterial color="#b0a090" roughness={0.95} />
       </mesh>
       {/* Inner ring — lighter stones */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, VILLAGE_Y + 0.02, 0]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, VILLAGE_Y + 0.03, 0]}>
         <ringGeometry args={[3.8, 5.5, 32]} />
         <meshStandardMaterial color="#c8b8a0" roughness={0.9} />
       </mesh>
