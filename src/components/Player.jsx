@@ -1,11 +1,12 @@
 import { useRef, useEffect, forwardRef, useMemo } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PLAYER_HALF_HEIGHT  } from '../gameData'
 import { keys, touchInput } from '../keys'
 import { createNoise2D, getTerrainHeight, WORLD_SEED } from './ProceduralWorld'
 
 const MOVE_SPEED = 8              // Direct movement speed
+const TURN_SPEED = 2.5            // Radians per second for left/right turning
 const JUMP_FORCE = 14
 const GRAVITY = -28
 const GLIDE_GRAVITY = -6
@@ -21,7 +22,6 @@ const hairTip = '#f87171'
 const hairHighlight = '#fca5a5'
 
 const Player = forwardRef(function Player({ returnTriggerRef }, ref) {
-  const { camera } = useThree()
   const verticalVel = useRef(0)
   const velocity = useRef({ x: 0, z: 0 })  // Horizontal momentum
   const onGround = useRef(true)
@@ -53,23 +53,17 @@ const Player = forwardRef(function Player({ returnTriggerRef }, ref) {
     if (!ref.current) return
     const mesh = ref.current
 
-    // ── Horizontal movement ──────────────────────────────────────────
-    const camForward = new THREE.Vector3()
-    camera.getWorldDirection(camForward)
-    camForward.y = 0
-    camForward.normalize()
-    const camRight = new THREE.Vector3().crossVectors(camForward, new THREE.Vector3(0, 1, 0)).normalize()
+    // ── Turning (left/right) ─────────────────────────────────────────
+    if (keys.has('KeyA') || keys.has('ArrowLeft'))  mesh.rotation.y += TURN_SPEED * delta
+    if (keys.has('KeyD') || keys.has('ArrowRight')) mesh.rotation.y -= TURN_SPEED * delta
+    if (touchInput.moveX !== 0) mesh.rotation.y -= touchInput.moveX * TURN_SPEED * delta
 
+    // ── Forward/back movement (relative to player facing) ────────────
+    const facing = new THREE.Vector3(Math.sin(mesh.rotation.y), 0, Math.cos(mesh.rotation.y))
     const moveDir = new THREE.Vector3()
-    if (keys.has('KeyW') || keys.has('ArrowUp'))    moveDir.add(camForward)
-    if (keys.has('KeyS') || keys.has('ArrowDown'))  moveDir.sub(camForward)
-    if (keys.has('KeyA') || keys.has('ArrowLeft'))  moveDir.sub(camRight)
-    if (keys.has('KeyD') || keys.has('ArrowRight')) moveDir.add(camRight)
-    // Touch virtual joystick: +moveY = dragged down = backward
-    if (touchInput.moveX !== 0 || touchInput.moveY !== 0) {
-      moveDir.addScaledVector(camRight,   touchInput.moveX)
-      moveDir.addScaledVector(camForward, -touchInput.moveY)
-    }
+    if (keys.has('KeyW') || keys.has('ArrowUp'))   moveDir.add(facing)
+    if (keys.has('KeyS') || keys.has('ArrowDown')) moveDir.sub(facing)
+    if (touchInput.moveY !== 0) moveDir.addScaledVector(facing, -touchInput.moveY)
 
     // Direct movement + coast
     if (moveDir.lengthSq() > 0) {
@@ -81,13 +75,6 @@ const Player = forwardRef(function Player({ returnTriggerRef }, ref) {
       velocity.current.x = moveDir.x * MOVE_SPEED * 0.5
       velocity.current.z = moveDir.z * MOVE_SPEED * 0.5
       isMoving.current = true
-
-      // Rotate player to face movement direction (smooth)
-      const targetAngle = Math.atan2(moveDir.x, moveDir.z)
-      let diff = targetAngle - mesh.rotation.y
-      while (diff > Math.PI) diff -= Math.PI * 2
-      while (diff < -Math.PI) diff += Math.PI * 2
-      mesh.rotation.y += diff * 0.18
     } else {
       // Coast when no input
       mesh.position.x += velocity.current.x * delta
