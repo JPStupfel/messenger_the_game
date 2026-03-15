@@ -13,9 +13,12 @@ import { NPCS } from '../gameData'
 import { touchInput } from '../keys'
 
 // ── Follow camera ─────────────────────────────────────────────────────────────
-const CAM_DISTANCE = 10
-const CAM_HEIGHT   = 4
-const CAM_LERP     = 0.1
+const CAM_DISTANCE      = 10
+const CAM_HEIGHT        = 4
+const CAM_LERP          = 0.1
+const CAM_AUTO_DELAY_MS   = 2000  // ms of no manual input before auto-follow kicks in
+const CAM_AUTO_RATE       = 2.0   // radians/sec convergence rate for auto-follow yaw
+const CAM_MOVEMENT_THRESH = 0.005 // min position change (units) to count as moving
 
 const TOUCH_JOYSTICK_RADIUS = 80  // px — how far to drag for full speed
 
@@ -25,6 +28,8 @@ function FollowCamera({ playerRef }) {
   const pitch = useRef(Math.PI * 0.42)  // Start low/behind the player
   const isDragging = useRef(false)
   const lastMouse  = useRef({ x: 0, y: 0 })
+  const lastManualInput = useRef(0)        // timestamp of last manual camera input
+  const prevPlayerPos   = useRef(new THREE.Vector3())  // for detecting movement
 
   // Touch tracking
   const activeTouches   = useRef({})   // id → {x, y}
@@ -46,6 +51,7 @@ function FollowCamera({ playerRef }) {
       lastMouse.current = { x: e.clientX, y: e.clientY }
       yaw.current   -= dx * 0.005
       pitch.current  = Math.max(0.05, Math.min(Math.PI * 0.45, pitch.current + dy * 0.005))
+      lastManualInput.current = Date.now()
     }
     const onMouseUp = () => { isDragging.current = false }
 
@@ -99,6 +105,7 @@ function FollowCamera({ playerRef }) {
         twoFingerLast.current = { x: midX, y: midY }
         yaw.current   -= dx * 0.005
         pitch.current  = Math.max(0.05, Math.min(Math.PI * 0.45, pitch.current + dy * 0.005))
+        lastManualInput.current = Date.now()
       }
     }
 
@@ -152,19 +159,38 @@ function FollowCamera({ playerRef }) {
   const _desired = new THREE.Vector3()
   const _lookAt  = new THREE.Vector3()
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!playerRef.current) return
-    const player = playerRef.current.position
+    const player = playerRef.current
+
+    // Auto-follow: when player is moving and no recent manual camera input,
+    // gently spin the yaw to sit behind the player's facing direction.
+    const pos = player.position
+    const isMoving = prevPlayerPos.current.distanceTo(pos) > CAM_MOVEMENT_THRESH
+    prevPlayerPos.current.copy(pos)
+
+    if (isMoving && !isDragging.current) {
+      const timeSinceInput = Date.now() - lastManualInput.current
+      if (timeSinceInput > CAM_AUTO_DELAY_MS) {
+        // Target yaw: directly behind the player (opposite of facing direction)
+        const targetYaw = player.rotation.y + Math.PI
+        let diff = targetYaw - yaw.current
+        // Normalise to [-π, π] for shortest-arc rotation
+        while (diff >  Math.PI) diff -= 2 * Math.PI
+        while (diff < -Math.PI) diff += 2 * Math.PI
+        yaw.current += diff * Math.min(1, CAM_AUTO_RATE * delta)
+      }
+    }
 
     // Spherical offset from player
     const x = CAM_DISTANCE * Math.sin(pitch.current) * Math.sin(yaw.current)
     const y = CAM_DISTANCE * Math.cos(pitch.current) + CAM_HEIGHT
     const z = CAM_DISTANCE * Math.sin(pitch.current) * Math.cos(yaw.current)
 
-    _desired.set(player.x + x, player.y + y, player.z + z)
+    _desired.set(pos.x + x, pos.y + y, pos.z + z)
     camera.position.lerp(_desired, CAM_LERP)
 
-    _lookAt.set(player.x, player.y + 1, player.z)
+    _lookAt.set(pos.x, pos.y + 1, pos.z)
     camera.lookAt(_lookAt)
   })
 
