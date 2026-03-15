@@ -15,7 +15,7 @@ const _dir       = new THREE.Vector3()
 
 export default function YetiFriend({ startPosition, playerRef }) {
   const groupRef = useRef()
-  const [befriended, setBefriended] = useState(false)
+  const [befriended, setBefriended] = useState(true)  // Always following!
   const [showHeart, setShowHeart]   = useState(false)
   const hopPhase = useRef(0)
   

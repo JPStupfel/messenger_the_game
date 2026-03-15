@@ -3,15 +3,14 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PLAYER_HALF_HEIGHT  } from '../gameData'
 import { keys, touchInput } from '../keys'
-import { createNoise2D, getTerrainHeight, getTerrainGradient, WORLD_SEED } from './ProceduralWorld'
+import { createNoise2D, getTerrainHeight, WORLD_SEED } from './ProceduralWorld'
 
-const SPEED = 8
+const SPEED = 12
 const JUMP_FORCE = 14
 const GRAVITY = -28
 const GLIDE_GRAVITY = -6
-const SLIDE_ACCELERATION = 25  // How fast you accelerate downhill
-const SLIDE_FRICTION = 0.92     // Friction when sliding (lower = more slide)
-const MAX_SLIDE_SPEED = 35      // Terminal sliding velocity
+const MOMENTUM_FRICTION = 0.9925 // How long momentum persists (higher = more glide)
+const MAX_SPEED = 25             // Max gliding speed
 
 // Skin material with subtle warmth
 const skinMat = { color: '#f5d0c5', roughness: 0.7, metalness: 0 }
@@ -25,7 +24,7 @@ const hairHighlight = '#fca5a5'
 const Player = forwardRef(function Player(_, ref) {
   const { camera } = useThree()
   const verticalVel = useRef(0)
-  const slideVel = useRef({ x: 0, z: 0 })  // Horizontal sliding velocity
+  const velocity = useRef({ x: 0, z: 0 })  // Horizontal momentum
   const onGround = useRef(true)
   const canJump = useRef(true)  // Tracks if space has been released
   
@@ -73,9 +72,12 @@ const Player = forwardRef(function Player(_, ref) {
       moveDir.addScaledVector(camForward, -touchInput.moveY)
     }
 
+    // Build momentum from input
     if (moveDir.lengthSq() > 0) {
       moveDir.normalize()
-      mesh.position.addScaledVector(moveDir, SPEED * delta)
+      // Add to velocity (accelerate)
+      velocity.current.x += moveDir.x * SPEED * delta
+      velocity.current.z += moveDir.z * SPEED * delta
       isMoving.current = true
 
       // Rotate player to face movement direction (smooth)
@@ -87,6 +89,21 @@ const Player = forwardRef(function Player(_, ref) {
     } else {
       isMoving.current = false
     }
+    
+    // Cap speed
+    const speed = Math.sqrt(velocity.current.x ** 2 + velocity.current.z ** 2)
+    if (speed > MAX_SPEED) {
+      velocity.current.x *= MAX_SPEED / speed
+      velocity.current.z *= MAX_SPEED / speed
+    }
+    
+    // Apply momentum to position (magic snowboard glides!)
+    mesh.position.x += velocity.current.x * delta
+    mesh.position.z += velocity.current.z * delta
+    
+    // Apply friction to slow down over time
+    velocity.current.x *= MOMENTUM_FRICTION
+    velocity.current.z *= MOMENTUM_FRICTION
 
     // ── Animate body ─────────────────────────────────────────────────
     breathePhase.current += delta * 2.5
@@ -128,48 +145,7 @@ const Player = forwardRef(function Player(_, ref) {
       onGround.current = true
     }
 
-    // ── Slope sliding physics ────────────────────────────────────────
-    if (onGround.current) {
-      const gradient = getTerrainGradient(noise, mesh.position.x, mesh.position.z)
-      
-      // Apply sliding force based on slope steepness
-      if (gradient.steepness > 0.1) {  // Only slide on noticeable slopes
-        // Accelerate downhill
-        slideVel.current.x += gradient.x * SLIDE_ACCELERATION * delta
-        slideVel.current.z += gradient.z * SLIDE_ACCELERATION * delta
-        
-        // Cap max speed
-        const slideSpeed = Math.sqrt(slideVel.current.x ** 2 + slideVel.current.z ** 2)
-        if (slideSpeed > MAX_SLIDE_SPEED) {
-          const scale = MAX_SLIDE_SPEED / slideSpeed
-          slideVel.current.x *= scale
-          slideVel.current.z *= scale
-        }
-      }
-      
-      // Apply friction (less on steep slopes)
-      const frictionMult = Math.max(0.8, SLIDE_FRICTION - gradient.steepness * 0.1)
-      slideVel.current.x *= frictionMult
-      slideVel.current.z *= frictionMult
-      
-      // Apply slide velocity to position
-      mesh.position.x += slideVel.current.x * delta
-      mesh.position.z += slideVel.current.z * delta
-      
-      // Tilt board based on slope
-      if (bodyRef.current && gradient.steepness > 0.05) {
-        const tiltAngle = Math.atan2(gradient.z, gradient.x)
-        bodyRef.current.rotation.x = THREE.MathUtils.lerp(
-          bodyRef.current.rotation.x, 
-          gradient.steepness * 0.3, 
-          0.1
-        )
-      }
-    } else {
-      // In air - reduce slide velocity slowly (air resistance)
-      slideVel.current.x *= 0.995
-      slideVel.current.z *= 0.995
-    }
+
 
     // ── Fall off world → respawn ──────────────────────────────────────
     if (mesh.position.y < -50) {
@@ -177,6 +153,8 @@ const Player = forwardRef(function Player(_, ref) {
       mesh.position.set(0, spawnHeight + 2, 0)
       mesh.rotation.y = 0
       verticalVel.current = 0
+      velocity.current.x = 0
+      velocity.current.z = 0
     }
 
     // ── Gliding behavior when falling ─────────────────────────────────
