@@ -16,7 +16,7 @@ export const NPCS = [
   {
     id: 'yeti',
     name: '🏔️ Yuki',
-    position: [55, 0, -30],
+    position: [192, 0, -105],
     villageSpot: [5, -4],
     bodyColor: '#e0f2fe',
     hatColor: '#7dd3fc',
@@ -37,7 +37,7 @@ export const NPCS = [
   {
     id: 'penguin',
     name: '🐧 Captain Waddle',
-    position: [-55, 0, 35],
+    position: [-193, 0, 123],
     villageSpot: [-5, 3],
     bodyColor: '#1e293b',
     hatColor: '#f97316',
@@ -58,7 +58,7 @@ export const NPCS = [
   {
     id: 'fox',
     name: '🦊 Frostpaw',
-    position: [-45, 0, -55],
+    position: [-158, 0, -193],
     villageSpot: [4, 5],
     bodyColor: '#f97316',
     hatColor: '#ea580c',
@@ -79,7 +79,7 @@ export const NPCS = [
   {
     id: 'walrus',
     name: '🦭 Old Whiskers',
-    position: [65, 0, 50],
+    position: [228, 0, 175],
     villageSpot: [-4, -5],
     bodyColor: '#78716c',
     hatColor: '#57534e',
@@ -100,7 +100,7 @@ export const NPCS = [
   {
     id: 'owl',
     name: '🦉 Aurora',
-    position: [80, 0, -65],
+    position: [280, 0, -228],
     villageSpot: [6, 1],
     bodyColor: '#dbeafe',
     hatColor: '#93c5fd',

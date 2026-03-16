@@ -123,12 +123,12 @@ function TownSquare() {
   return (
     <>
       {/* Cobblestone floor */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, VILLAGE_Y + 0.01, 0]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, VILLAGE_Y + 0.02, 0]}>
         <circleGeometry args={[9, 32]} />
         <meshStandardMaterial color="#b0a090" roughness={0.95} />
       </mesh>
       {/* Inner ring — lighter stones */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, VILLAGE_Y + 0.02, 0]}>
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, VILLAGE_Y + 0.03, 0]}>
         <ringGeometry args={[3.8, 5.5, 32]} />
         <meshStandardMaterial color="#c8b8a0" roughness={0.9} />
       </mesh>
@@ -280,9 +280,9 @@ export default function Village({ playerRef }) {
 
   return (
     <group>
-      {/* Ground snow layer for village */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, BASE - 0.02, 0]}>
-        <circleGeometry args={[34, 48]} />
+      {/* Ground snow layer for village — sits just above ice sheet to avoid Z-fighting */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+        <circleGeometry args={[36, 64]} />
         <meshStandardMaterial color="#deeef8" roughness={0.85} />
       </mesh>
 

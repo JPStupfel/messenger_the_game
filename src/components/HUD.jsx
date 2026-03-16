@@ -55,9 +55,9 @@ export default function HUD({ rescuedCount, totalCount, followingCount, showPath
         <div className="text-purple-300 font-bold mb-1 text-base">Controls</div>
         {isTouch ? (
           <>
-            <div>👆 <span className="text-white/80">Drag to move</span></div>
-            <div>✌️ <span className="text-white/80">Two fingers to turn</span></div>
-            <div>👇 <span className="text-white/80">Tap to jump</span></div>
+            <div>👆 <span className="text-white/80">Hold to move toward finger</span></div>
+            <div>✌️ <span className="text-white/80">Two fingers to tilt camera</span></div>
+            <div>👇 <span className="text-white/80">Quick tap to jump</span></div>
           </>
         ) : (
           <>

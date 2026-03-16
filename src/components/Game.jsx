@@ -13,11 +13,13 @@ import { NPCS } from '../gameData'
 import { touchInput } from '../keys'
 
 // ── Follow camera ─────────────────────────────────────────────────────────────
-const CAM_DISTANCE = 10
-const CAM_HEIGHT   = 4
-const CAM_LERP     = 0.1
+const CAM_DISTANCE    = 10
+const CAM_HEIGHT      = 4
+const CAM_LERP        = 0.1
+const CAM_FOLLOW_RATE = 10   // rad/s — how fast yaw locks behind the player
 
-const TOUCH_JOYSTICK_RADIUS = 80  // px — how far to drag for full speed
+const TAP_MAX_MS = 250   // Tap must be shorter than this to count as a jump
+const TAP_MAX_PX = 15    // Tap must move less than this to count as a jump
 
 function FollowCamera({ playerRef }) {
   const { camera, gl } = useThree()
@@ -27,24 +29,28 @@ function FollowCamera({ playerRef }) {
   const lastMouse  = useRef({ x: 0, y: 0 })
 
   // Touch tracking
-  const activeTouches   = useRef({})   // id → {x, y}
-  const singleStart     = useRef(null) // {x, y, time, maxMove}
-  const twoFingerLast   = useRef({ x: 0, y: 0 })
+  const activeTouches = useRef({})   // id → {x, y}
+  const tapStart      = useRef(null) // {x, y, time, maxMove} — for tap-to-jump detection
+  const twoFingerLast = useRef({ x: 0, y: 0 })
+
+  // Raycasting helpers — stable refs so no per-frame GC pressure
+  const _raycaster   = useRef(new THREE.Raycaster())
+  const _groundPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0))
+  const _touchWorld  = useRef(new THREE.Vector3())
+  const _ndcPt       = useRef(new THREE.Vector2())
 
   useEffect(() => {
     const canvas = gl.domElement
 
-    // ── Mouse: camera orbit (desktop) ───────────────────────────────
+    // ── Mouse: camera pitch only (desktop) ──────────────────────────
     const onMouseDown = (e) => {
       isDragging.current = true
       lastMouse.current = { x: e.clientX, y: e.clientY }
     }
     const onMouseMove = (e) => {
       if (!isDragging.current) return
-      const dx = e.clientX - lastMouse.current.x
       const dy = e.clientY - lastMouse.current.y
       lastMouse.current = { x: e.clientX, y: e.clientY }
-      yaw.current   -= dx * 0.005
       pitch.current  = Math.max(0.05, Math.min(Math.PI * 0.45, pitch.current + dy * 0.005))
     }
     const onMouseUp = () => { isDragging.current = false }
@@ -57,12 +63,14 @@ function FollowCamera({ playerRef }) {
       const count = Object.keys(activeTouches.current).length
       if (count === 1) {
         const t = e.changedTouches[0]
-        singleStart.current = { x: t.clientX, y: t.clientY, time: Date.now(), maxMove: 0 }
+        // Store screen position — world target is projected in useFrame
+        touchInput._screenPos = { x: t.clientX, y: t.clientY }
+        // Track tap start for jump detection
+        tapStart.current = { x: t.clientX, y: t.clientY, time: Date.now(), maxMove: 0 }
       } else {
-        // Moving to 2-finger mode — zero movement, prepare camera drag
-        touchInput.moveX = 0
-        touchInput.moveY = 0
-        singleStart.current = null
+        // Moving to 2-finger mode — stop navigation, prepare camera drag
+        touchInput._screenPos = null
+        tapStart.current = null
         const ids = Object.keys(activeTouches.current)
         twoFingerLast.current = {
           x: (activeTouches.current[ids[0]].x + activeTouches.current[ids[1]].x) / 2,
@@ -78,26 +86,25 @@ function FollowCamera({ playerRef }) {
 
       const ids = Object.keys(activeTouches.current)
 
-      if (ids.length === 1 && singleStart.current) {
-        // ── 1 finger: virtual joystick → player movement ────────────
+      if (ids.length === 1) {
+        // ── 1 finger: update navigation target position ──────────────
         const pos = activeTouches.current[ids[0]]
-        const dx = pos.x - singleStart.current.x
-        const dy = pos.y - singleStart.current.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        singleStart.current.maxMove = Math.max(singleStart.current.maxMove, dist)
-        touchInput.moveX = Math.max(-1, Math.min(1, dx / TOUCH_JOYSTICK_RADIUS))
-        touchInput.moveY = Math.max(-1, Math.min(1, dy / TOUCH_JOYSTICK_RADIUS)) // +Y = drag down = backward
+        touchInput._screenPos = { x: pos.x, y: pos.y }
+        // Track movement for tap detection
+        if (tapStart.current) {
+          const dx = pos.x - tapStart.current.x
+          const dy = pos.y - tapStart.current.y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          tapStart.current.maxMove = Math.max(tapStart.current.maxMove, dist)
+        }
 
       } else if (ids.length >= 2) {
-        // ── 2 fingers: camera rotation ──────────────────────────────
-        touchInput.moveX = 0
-        touchInput.moveY = 0
+        // ── 2 fingers: camera pitch ──────────────────────────────────
+        touchInput._screenPos = null
         const midX = (activeTouches.current[ids[0]].x + activeTouches.current[ids[1]].x) / 2
         const midY = (activeTouches.current[ids[0]].y + activeTouches.current[ids[1]].y) / 2
-        const dx = midX - twoFingerLast.current.x
         const dy = midY - twoFingerLast.current.y
         twoFingerLast.current = { x: midX, y: midY }
-        yaw.current   -= dx * 0.005
         pitch.current  = Math.max(0.05, Math.min(Math.PI * 0.45, pitch.current + dy * 0.005))
       }
     }
@@ -109,23 +116,21 @@ function FollowCamera({ playerRef }) {
       const remaining = Object.keys(activeTouches.current).length
       if (remaining === 0) {
         // Detect tap → jump
-        if (singleStart.current) {
-          const elapsed = Date.now() - singleStart.current.time
-          if (elapsed < 250 && singleStart.current.maxMove < 15) {
+        if (tapStart.current) {
+          const elapsed = Date.now() - tapStart.current.time
+          if (elapsed < TAP_MAX_MS && tapStart.current.maxMove < TAP_MAX_PX) {
             touchInput.jump = true
             setTimeout(() => { touchInput.jump = false }, 150)
           }
         }
-        touchInput.moveX = 0
-        touchInput.moveY = 0
-        singleStart.current = null
+        touchInput._screenPos = null
+        tapStart.current = null
       } else if (remaining === 1) {
-        // Dropped back to 1 finger — restart joystick from current position
-        touchInput.moveX = 0
-        touchInput.moveY = 0
+        // Dropped back to 1 finger — resume navigation from remaining finger
         const id = Object.keys(activeTouches.current)[0]
         const pos = activeTouches.current[id]
-        singleStart.current = { x: pos.x, y: pos.y, time: Date.now(), maxMove: 0 }
+        touchInput._screenPos = { x: pos.x, y: pos.y }
+        tapStart.current = { x: pos.x, y: pos.y, time: Date.now(), maxMove: 0 }
       }
     }
 
@@ -152,19 +157,43 @@ function FollowCamera({ playerRef }) {
   const _desired = new THREE.Vector3()
   const _lookAt  = new THREE.Vector3()
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!playerRef.current) return
-    const player = playerRef.current.position
+    const player = playerRef.current
+    const pos = player.position
+
+    // ── Project 1-finger screen position → 3-D world navigation target ──────
+    if (touchInput._screenPos) {
+      const rect = gl.domElement.getBoundingClientRect()
+      _ndcPt.current.set(
+        ((touchInput._screenPos.x - rect.left) / rect.width)  *  2 - 1,
+        -((touchInput._screenPos.y - rect.top)  / rect.height) *  2 + 1,
+      )
+      _raycaster.current.setFromCamera(_ndcPt.current, camera)
+      if (_raycaster.current.ray.intersectPlane(_groundPlane.current, _touchWorld.current)) {
+        touchInput.worldTarget = { x: _touchWorld.current.x, z: _touchWorld.current.z }
+      }
+    } else {
+      touchInput.worldTarget = null
+    }
+
+    // Always track directly behind the player's facing direction
+    const targetYaw = player.rotation.y + Math.PI
+    let diff = targetYaw - yaw.current
+    // Normalise to [-π, π] for shortest-arc rotation
+    while (diff >  Math.PI) diff -= 2 * Math.PI
+    while (diff < -Math.PI) diff += 2 * Math.PI
+    yaw.current += diff * Math.min(1, CAM_FOLLOW_RATE * delta)
 
     // Spherical offset from player
     const x = CAM_DISTANCE * Math.sin(pitch.current) * Math.sin(yaw.current)
     const y = CAM_DISTANCE * Math.cos(pitch.current) + CAM_HEIGHT
     const z = CAM_DISTANCE * Math.sin(pitch.current) * Math.cos(yaw.current)
 
-    _desired.set(player.x + x, player.y + y, player.z + z)
+    _desired.set(pos.x + x, pos.y + y, pos.z + z)
     camera.position.lerp(_desired, CAM_LERP)
 
-    _lookAt.set(player.x, player.y + 1, player.z)
+    _lookAt.set(pos.x, pos.y + 1, pos.z)
     camera.lookAt(_lookAt)
   })
 
